@@ -1,8 +1,7 @@
 ---
-title: 'Architecture and Design'
-description: 'PlatyMap uses a multi-layered architecture, let's over them and study the different design patterns used'
+title: "Architecture and System Design "
+description: "PlatyMap uses a multi-layered architecture, we will go over the big picture and discuss used design patterns."
 ---
-
 
 ## Architecture Overview
 
@@ -22,6 +21,7 @@ The flow of data through the system is:
 5. The transformed data is returned in the desired format
 
 This architecture follows several design principles:
+
 - **Separation of Concerns**: Each component has a single responsibility
 - **Immutability**: Most objects are immutable after creation
 - **Fluent Interface**: Method chaining for a readable API
@@ -38,6 +38,7 @@ The PlatyMap library uses several design patterns that are important to understa
 The Builder pattern is used extensively throughout the library to construct complex objects through a fluent interface.
 
 **Example**:
+
 ```kotlin
 val mapping = Platymap.flow("source")
     .withFormat(Format.JSON)
@@ -49,6 +50,7 @@ val mapping = Platymap.flow("source")
 In this example, `flow()`, `withFormat()`, `to()`, `map()`, and `to()` are all part of a builder chain that constructs a `Mapping` object.
 
 **Key Builder Classes**:
+
 - `SourceBuilder`
 - `TargetBuilder`
 - `MappingBuilder`
@@ -62,6 +64,7 @@ The Strategy pattern defines a family of algorithms, encapsulating each one, and
 In PlatyMap, each `MappingRule` is a strategy for transforming data.
 
 **Example**:
+
 ```kotlin
 interface MappingRule {
     fun apply(context: MappingContext, target: Any)
@@ -85,6 +88,7 @@ The Composite pattern composes objects into tree structures to represent part-wh
 PlatyMap uses this pattern with nested rules and branches.
 
 **Example**:
+
 ```kotlin
 // A composite rule that contains other rules
 class BranchMapping(branches: List<ConditionalBranch>) : MappingRule {
@@ -117,6 +121,7 @@ The Factory Method pattern defines an interface for creating an object, but lets
 PlatyMap uses factory methods to create different rule types.
 
 **Example**:
+
 ```kotlin
 // Factory method to create a SimpleMapping
 fun map(sourcePath: String): MappingBuilder {
@@ -159,30 +164,39 @@ PlatyMap uses this in its builder chain, where each builder adds to the configur
 The library is organized into several packages:
 
 ### `xyz.mahmoudahmed.dsl.core`
+
 Contains the core interfaces and classes like `MappingRule`, `MappingContext`, and `Mapping`.
 
 ### `xyz.mahmoudahmed.dsl.builders`
+
 Contains the builder classes that form the DSL.
 
 ### `xyz.mahmoudahmed.dsl.functions`
+
 Contains the function registry and function-related classes.
 
 ### `xyz.mahmoudahmed.dsl.collections`
+
 Contains classes for handling collections like `ForEachMapping`.
 
 ### `xyz.mahmoudahmed.dsl.conditional`
+
 Contains classes for conditional branching like `BranchBuilder` and `ConditionalBranch`.
 
 ### `xyz.mahmoudahmed.dsl.structure`
+
 Contains classes for structural operations like nesting and flattening.
 
 ### `xyz.mahmoudahmed.dsl.bulk`
+
 Contains classes for bulk operations like `BulkMappingRule`.
 
 ### `xyz.mahmoudahmed.dsl.typed`
+
 Contains classes for type-safe mappings with Java beans.
 
 ### `xyz.mahmoudahmed.dsl.util`
+
 Contains utility classes like `PathMatcher`.
 
 ---
@@ -315,6 +329,7 @@ println(result)
 ```
 
 This will produce:
+
 ```json
 {
     "fullName": "John Doe",
@@ -459,6 +474,7 @@ val mapping = Platymap.flow("flatCustomer")
 ```
 
 This transforms:
+
 ```json
 {
     "address.street": "123 Main St",
@@ -468,6 +484,7 @@ This transforms:
 ```
 
 Into:
+
 ```json
 {
     "contact": {
@@ -492,6 +509,7 @@ val mapping = Platymap.flow("flatCustomer")
 ```
 
 This transforms:
+
 ```json
 {
     "phones.home": "555-1234",
@@ -501,6 +519,7 @@ This transforms:
 ```
 
 Into:
+
 ```json
 {
     "contact": {
@@ -528,6 +547,7 @@ val mapping = Platymap.flow("nestedCustomer")
 ```
 
 This transforms:
+
 ```json
 {
     "contact": {
@@ -541,6 +561,7 @@ This transforms:
 ```
 
 Into:
+
 ```json
 {
     "address_street": "123 Main St",
