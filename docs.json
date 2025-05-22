@@ -26,7 +26,7 @@
             "pages": [
               "essentials/kotlin-basics",
               "essentials/architecture",
-              "essentials/images",
+              "essentials/extend",
               "essentials/settings",
               "essentials/navigation",
               "essentials/reusable-snippets"
