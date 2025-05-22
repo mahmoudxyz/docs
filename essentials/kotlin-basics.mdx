@@ -1,0 +1,215 @@
+---
+title: "Kotlin Basics for Java Developers"
+description: "Before diving into the library, let's cover some Kotlin basics that will help you understand the code better."
+icon: "text-size"
+---
+
+### Intro 
+
+Before diving into the library, let's cover some Kotlin basics that will help you understand the code better.
+
+### Variables and Types
+
+In Java, you declare variables like this:
+```java
+String name = "John";
+final int age = 30;
+```
+
+In Kotlin, we use `val` for immutable (like Java's `final`) and `var` for mutable variables:
+```kotlin
+val name: String = "John"  // Immutable (can't be reassigned)
+var age: Int = 30          // Mutable (can be changed)
+```
+
+Kotlin often infers types, so you can omit them:
+```kotlin
+val name = "John"  // Compiler knows this is a String
+var age = 30       // Compiler knows this is an Int
+```
+
+### Null Safety
+
+Kotlin distinguishes between nullable and non-nullable types:
+
+```kotlin
+var name: String = "John"     // Can't be null
+var name: String? = "John"    // Can be null
+name = null                   // OK
+
+// Safe call operator (returns null if name is null)
+val length = name?.length     // Type is Int?
+
+// Elvis operator (provides default if left side is null)
+val length = name?.length ?: 0  // Type is Int
+
+// Non-null assertion (throws exception if null)
+val length = name!!.length     // Use with caution!
+```
+
+### Functions
+
+Java method:
+```java
+public String formatGreeting(String name) {
+    return "Hello, " + name + "!";
+}
+```
+
+Kotlin function:
+```kotlin
+fun formatGreeting(name: String): String {
+    return "Hello, $name!"  // String template
+}
+```
+
+Single-expression functions can be shortened:
+```kotlin
+fun formatGreeting(name: String) = "Hello, $name!"
+```
+
+### Extension Functions
+
+Kotlin lets you "add" methods to existing classes:
+
+```kotlin
+// Adds a method to the String class
+fun String.addExclamation(): String {
+    return "$this!"
+}
+
+val greeting = "Hello".addExclamation()  // "Hello!"
+```
+
+### Lambda Expressions
+
+Java 8+ lambda:
+```java
+Function<String, Integer> getLength = (String s) -> s.length();
+```
+
+Kotlin lambda:
+```kotlin
+val getLength: (String) -> Int = { s -> s.length }
+// or just
+val getLength = { s: String -> s.length }
+```
+
+### Classes
+
+Java class:
+```java
+public class Person {
+    private String name;
+    private int age;
+    
+    public Person(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+    
+    public String getName() { return name; }
+    public int getAge() { return age; }
+}
+```
+
+Kotlin class:
+```kotlin
+class Person(val name: String, val age: Int)  // That's it!
+```
+
+Kotlin creates the constructor, fields, and getters automatically. If you need custom getters/setters:
+
+```kotlin
+class Person(name: String, age: Int) {
+    val name: String = name
+        get() = field.uppercase()  // Custom getter
+    
+    var age: Int = age
+        set(value) {  // Custom setter
+            if (value > 0) field = value
+        }
+}
+```
+
+### Data Classes
+
+For classes that just hold data:
+
+```kotlin
+data class Person(val name: String, val age: Int)
+```
+
+This automatically creates:
+- Constructor
+- Getters (and setters for `var` properties)
+- `equals()` and `hashCode()`
+- `toString()`
+- `copy()` function for easy cloning with changes
+
+### Object Keyword
+
+Kotlin's `object` creates a singleton:
+
+```kotlin
+object Logger {
+    fun log(message: String) {
+        println(message)
+    }
+}
+
+// Usage:
+Logger.log("Hello world")
+```
+
+### Companion Objects
+
+Similar to Java static methods:
+
+```kotlin
+class MyClass {
+    companion object {
+        fun create(): MyClass = MyClass()
+    }
+}
+
+// Usage:
+val instance = MyClass.create()
+```
+
+### When Expression
+
+Replaces and enhances switch statements:
+
+```kotlin
+val result = when (value) {
+    1 -> "One"
+    2 -> "Two"
+    in 3..10 -> "Between 3 and 10"
+    is String -> "It's a string: $value"
+    else -> "Something else"
+}
+```
+
+### Smart Casts
+
+Kotlin casts automatically after type checks:
+
+```java
+// Java
+if (obj instanceof String) {
+    String str = (String) obj;  // Cast needed
+    System.out.println(str.length());
+}
+```
+
+```kotlin
+// Kotlin
+if (obj is String) {
+    println(obj.length)  // No cast needed
+}
+```
+
+---
+
+## Ar
