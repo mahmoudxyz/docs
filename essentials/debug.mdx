@@ -1,0 +1,216 @@
+---
+title: "Global Settings"
+description: "Debugging data mapping can be challenging. Here are some techniques to help"
+icon: "gear"
+---
+
+
+### Logging Intermediate Values
+
+You can use the `map` operation to log values without changing the mapping:
+
+```kotlin
+val mapping = Platymap.flow("source")
+    .to("target")
+    .map("customer.name").transform { 
+        println("Name: $it")  // Log the value
+        it  // Return unchanged
+    }.to("name")
+    .build()
+```
+
+### Using Try-Catch for Error Handling
+
+Wrap your mapping execution in try-catch blocks to handle errors:
+
+```kotlin
+try {
+    val result = mapping.execute(sourceData)
+    // Process result
+} catch (e: MappingExecutionException) {
+    println("Mapping error: ${e.message}")
+    e.printStackTrace()
+}
+```
+
+### Validating Mappings
+
+Before executing a mapping with real data, you can validate it with test data:
+
+```kotlin
+fun validateMapping(mapping: Mapping, testData: Any): Boolean {
+    try {
+        mapping.execute(testData)
+        return true
+    } catch (e: Exception) {
+        println("Validation failed: ${e.message}")
+        return false
+    }
+}
+```
+
+### Debugging DSL Construction
+
+If you're having issues with the DSL syntax, break it down into smaller parts:
+
+```kotlin
+// Instead of a single chain
+val mapping = Platymap.flow("source")
+    .to("target")
+    .map("a").to("x")
+    .map("b").to("y")
+    .build()
+
+// Break it down
+val sourceBuilder = Platymap.flow("source")
+val targetBuilder = sourceBuilder.to("target")
+val builderAfterFirstMap = targetBuilder.map("a").to("x")
+val builderAfterSecondMap = builderAfterFirstMap.map("b").to("y")
+val mapping = builderAfterSecondMap.build()
+```
+
+This allows you to inspect each builder step and understand what's happening.
+
+### Common Issues and Solutions
+
+1. **Null Values**: If a source path doesn't exist, the value will be null. Use transformations to provide defaults:
+   ```kotlin
+   .map("optional.field").transform { it ?: "default" }.to("required.field")
+   ```
+
+2. **Type Mismatches**: Be careful with type casting. Use safe casts or checks:
+   ```kotlin
+   .map("value").transform { 
+       when (it) {
+           is Number -> it.toDouble()
+           is String -> it.toDoubleOrNull() ?: 0.0
+           else -> 0.0
+       }
+   }.to("numericValue")
+   ```
+
+3. **Path Syntax**: Make sure you're using the correct path syntax:
+   - Simple path: `"customer.name"`
+   - Array index: `"items[0].name"`
+   - Variable reference: `"$variable.property"`
+   - Literal value: `"'static text'"`
+
+4. **Builder Chain**: Each builder method returns either the same builder (for configuration) or a new builder (for a new context). Make sure you understand the builder flow.
+
+---
+
+## Best Practices
+
+### Organizing Mappings
+
+For large projects, organize your mappings into separate files or classes:
+
+```kotlin
+object CustomerMappings {
+    fun createCustomerToUserMapping(): Mapping {
+        return Platymap.flow("customer")
+            .to("user")
+            .map("name").to("fullName")
+            // More mappings...
+            .build()
+    }
+    
+    fun createUserToCustomerMapping(): Mapping {
+        // Reverse mapping
+    }
+}
+```
+
+### Reusing Mapping Logic
+
+Extract common mapping logic into functions:
+
+```kotlin
+fun TargetBuilder.mapAddress(sourcePrefix: String, targetPrefix: String): TargetBuilder {
+    return this
+        .map("$sourcePrefix.street").to("$targetPrefix.streetAddress")
+        .map("$sourcePrefix.city").to("$targetPrefix.city")
+        .map("$sourcePrefix.state").to("$targetPrefix.state")
+        .map("$sourcePrefix.zip").to("$targetPrefix.postalCode")
+}
+
+// Usage
+val mapping = Platymap.flow("customer")
+    .to("user")
+    .mapAddress("address", "contactAddress")
+    .build()
+```
+
+### Error Handling
+
+Add error handling to your transformations:
+
+```kotlin
+.map("value").transform { value ->
+    try {
+        // Risky operation
+        (value as String).toInt()
+    } catch (e: Exception) {
+        // Fallback
+        0
+    }
+}.to("safeValue")
+```
+
+### Testing Mappings
+
+Create unit tests for your mappings:
+
+```kotlin
+@Test
+fun testCustomerToUserMapping() {
+    val mapping = CustomerMappings.createCustomerToUserMapping()
+    
+    val customer = mapOf(
+        "name" to "John Doe",
+        "email" to "john@example.com"
+    )
+    
+    val result = mapping.execute(customer)
+    
+    // Assert on the result
+    val resultMap = result as DataNode.ObjectNode
+    assertEquals("John Doe", resultMap.get("fullName")?.toString())
+    assertEquals("john@example.com", resultMap.get("contactEmail")?.toString())
+}
+```
+
+### Performance Considerations
+
+1. **Reuse Mappings**: Create mappings once and reuse them.
+2. **Avoid Excessive Transformations**: Only transform data when necessary.
+3. **Use Bulk Operations**: Use `mapAll` for multiple fields when possible.
+4. **Cache Path Accessors**: For repeated access to the same path.
+
+### Documentation
+
+Document your mappings, especially for complex transformations:
+
+```kotlin
+/**
+ * Maps a customer object to a user object.
+ * 
+ * Source fields:
+ * - name: Customer's full name
+ * - email: Customer's email address
+ * - address: Nested object with street, city, state, zip
+ * 
+ * Target fields:
+ * - fullName: User's full name (from customer.name)
+ * - contactEmail: User's email (from customer.email)
+ * - location: Nested object with formatted address information
+ */
+fun createCustomerToUserMapping(): Mapping {
+    return Platymap.flow("customer")
+        .to("user")
+        // Mapping rules...
+        .build()
+}
+```
+
+---
