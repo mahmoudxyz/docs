@@ -4,6 +4,9 @@ description: "Debugging data mapping can be challenging. Here are some technique
 icon: "gear"
 ---
 
+<Info>
+  Moving forward, we will integrate `log`into the DSL to simplify and enhance the debugging and logging process.
+</Info>
 
 ### Logging Intermediate Values
 
@@ -74,11 +77,12 @@ This allows you to inspect each builder step and understand what's happening.
 ### Common Issues and Solutions
 
 1. **Null Values**: If a source path doesn't exist, the value will be null. Use transformations to provide defaults:
+
    ```kotlin
    .map("optional.field").transform { it ?: "default" }.to("required.field")
    ```
-
 2. **Type Mismatches**: Be careful with type casting. Use safe casts or checks:
+
    ```kotlin
    .map("value").transform { 
        when (it) {
@@ -88,13 +92,11 @@ This allows you to inspect each builder step and understand what's happening.
        }
    }.to("numericValue")
    ```
-
 3. **Path Syntax**: Make sure you're using the correct path syntax:
    - Simple path: `"customer.name"`
    - Array index: `"items[0].name"`
    - Variable reference: `"$variable.property"`
    - Literal value: `"'static text'"`
-
 4. **Builder Chain**: Each builder method returns either the same builder (for configuration) or a new builder (for a new context). Make sure you understand the builder flow.
 
 ---
