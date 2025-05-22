@@ -25,7 +25,7 @@
             "group": "Essentials",
             "pages": [
               "essentials/kotlin-basics",
-              "essentials/code",
+              "essentials/architecture",
               "essentials/images",
               "essentials/settings",
               "essentials/navigation",

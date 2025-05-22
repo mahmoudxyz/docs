@@ -1,0 +1,596 @@
+---
+title: 'Architecture and Design'
+description: 'PlatyMap uses a multi-layered architecture, let's over them and study the different design patterns used'
+---
+
+
+## Architecture Overview
+
+PlatyMap uses a multi-layered architecture:
+
+1. **User Interface Layer**: The DSL builders that provide a fluent API for creating mappings
+2. **Rule Layer**: The rules that define how data is transformed
+3. **Execution Layer**: The context and execution engine that applies the rules to data
+4. **Utility Layer**: Helper functions, extension methods, and registry services
+
+The flow of data through the system is:
+
+1. User creates a mapping using the DSL
+2. The DSL creates mapping rules
+3. The mapping is executed with source data
+4. The execution engine applies each rule to transform the data
+5. The transformed data is returned in the desired format
+
+This architecture follows several design principles:
+- **Separation of Concerns**: Each component has a single responsibility
+- **Immutability**: Most objects are immutable after creation
+- **Fluent Interface**: Method chaining for a readable API
+- **Composition over Inheritance**: Rules are composed rather than inherited
+
+---
+
+## Design Patterns Used
+
+The PlatyMap library uses several design patterns that are important to understand:
+
+### Builder Pattern
+
+The Builder pattern is used extensively throughout the library to construct complex objects through a fluent interface.
+
+**Example**:
+```kotlin
+val mapping = Platymap.flow("source")
+    .withFormat(Format.JSON)
+    .to("target")
+    .map("name").to("fullName")
+    .build()
+```
+
+In this example, `flow()`, `withFormat()`, `to()`, `map()`, and `to()` are all part of a builder chain that constructs a `Mapping` object.
+
+**Key Builder Classes**:
+- `SourceBuilder`
+- `TargetBuilder`
+- `MappingBuilder`
+- `BranchBuilder`
+- `ForEachBuilder`
+
+### Strategy Pattern
+
+The Strategy pattern defines a family of algorithms, encapsulating each one, and making them interchangeable.
+
+In PlatyMap, each `MappingRule` is a strategy for transforming data.
+
+**Example**:
+```kotlin
+interface MappingRule {
+    fun apply(context: MappingContext, target: Any)
+}
+
+class SimpleMapping(
+    private val sourcePath: String,
+    private val targetPath: String,
+    private val transformation: ((Any) -> Any)?
+) : MappingRule {
+    override fun apply(context: MappingContext, target: Any) {
+        // Implementation here
+    }
+}
+```
+
+### Composite Pattern
+
+The Composite pattern composes objects into tree structures to represent part-whole hierarchies.
+
+PlatyMap uses this pattern with nested rules and branches.
+
+**Example**:
+```kotlin
+// A composite rule that contains other rules
+class BranchMapping(branches: List<ConditionalBranch>) : MappingRule {
+    private val branches = ArrayList(branches)
+
+    override fun apply(context: MappingContext, target: Any) {
+        for (branch in branches) {
+            if (branch.condition(context.sourceData)) {
+                // Execute child rules in the branch
+                for (rule in branch.actions) {
+                    rule.apply(context, target)
+                }
+                break
+            }
+        }
+    }
+}
+```
+
+### Command Pattern
+
+The Command pattern encapsulates a request as an object, allowing parameterization of clients with different requests.
+
+Each mapping rule acts as a command that can be executed on data.
+
+### Factory Method Pattern
+
+The Factory Method pattern defines an interface for creating an object, but lets subclasses decide which class to instantiate.
+
+PlatyMap uses factory methods to create different rule types.
+
+**Example**:
+```kotlin
+// Factory method to create a SimpleMapping
+fun map(sourcePath: String): MappingBuilder {
+    return MappingBuilder(this, sourcePath)
+}
+```
+
+### Registry Pattern
+
+The Registry pattern provides a central place to store objects that need to be globally accessible.
+
+The `FunctionRegistry` in PlatyMap is an example:
+
+```kotlin
+object FunctionRegistry {
+    private val functions = ConcurrentHashMap<String, MapFunction>()
+    
+    fun register(function: MapFunction) {
+        functions[function.name] = function
+    }
+    
+    fun get(name: String): MapFunction {
+        return functions[name] ?: throw FunctionNotFoundException(name)
+    }
+    
+    // More methods...
+}
+```
+
+### Chain of Responsibility Pattern
+
+The Chain of Responsibility pattern passes a request along a chain of handlers. Each handler decides to process the request or pass it to the next handler.
+
+PlatyMap uses this in its builder chain, where each builder adds to the configuration and passes control to the next builder.
+
+---
+
+## Package Structure
+
+The library is organized into several packages:
+
+### `xyz.mahmoudahmed.dsl.core`
+Contains the core interfaces and classes like `MappingRule`, `MappingContext`, and `Mapping`.
+
+### `xyz.mahmoudahmed.dsl.builders`
+Contains the builder classes that form the DSL.
+
+### `xyz.mahmoudahmed.dsl.functions`
+Contains the function registry and function-related classes.
+
+### `xyz.mahmoudahmed.dsl.collections`
+Contains classes for handling collections like `ForEachMapping`.
+
+### `xyz.mahmoudahmed.dsl.conditional`
+Contains classes for conditional branching like `BranchBuilder` and `ConditionalBranch`.
+
+### `xyz.mahmoudahmed.dsl.structure`
+Contains classes for structural operations like nesting and flattening.
+
+### `xyz.mahmoudahmed.dsl.bulk`
+Contains classes for bulk operations like `BulkMappingRule`.
+
+### `xyz.mahmoudahmed.dsl.typed`
+Contains classes for type-safe mappings with Java beans.
+
+### `xyz.mahmoudahmed.dsl.util`
+Contains utility classes like `PathMatcher`.
+
+---
+
+## Core Components
+
+### `MappingRule` Interface
+
+The fundamental building block of all mappings:
+
+```kotlin
+interface MappingRule {
+    /**
+     * Applies this mapping rule to transform source data to target data.
+     *
+     * @param context The context containing source data and variables
+     * @param target The target object to populate
+     */
+    fun apply(context: MappingContext, target: Any)
+}
+```
+
+All mapping rules implement this interface.
+
+### `MappingContext` Class
+
+Holds the source data and provides access to values by path:
+
+```kotlin
+class MappingContext(val sourceData: Any) {
+    private val variables = mutableMapOf<String, Any>()
+    
+    fun setVariable(name: String, value: Any) {
+        variables[name] = value
+    }
+    
+    fun getVariable(name: String): Any? {
+        return variables[name]
+    }
+    
+    fun getValueByPath(path: String): Any? {
+        // Implementation that extracts values using the path
+    }
+}
+```
+
+### `Mapping` Class
+
+The main class that executes a mapping:
+
+```kotlin
+class Mapping(
+    val sourceName: String,
+    private val sourceFormat: Format,
+    val targetName: String,
+    private val targetFormat: Format,
+    private val rules: List<MappingRule>
+) {
+    fun execute(sourceData: Any): Any {
+        // Implementation that applies all rules to transform the data
+    }
+    
+    // Other methods...
+}
+```
+
+### `SimpleMapping` Class
+
+The most basic mapping rule that maps a single value:
+
+```kotlin
+class SimpleMapping(
+    private val sourcePath: String,
+    private val targetPath: String,
+    private val transformation: ((Any) -> Any)?,
+    private val condition: ((Any) -> Boolean)?
+) : MappingRule {
+    override fun apply(context: MappingContext, target: Any) {
+        // Implementation that extracts a value and sets it in the target
+    }
+}
+```
+
+### `Platymap` Object
+
+The entry point to the DSL:
+
+```kotlin
+object Platymap {
+    fun flow(source: String): SourceBuilder {
+        return SourceBuilder(source)
+    }
+    
+    fun <S> flow(sourceClass: Class<S>): TypedSourceBuilder<S> {
+        return TypedSourceBuilder(sourceClass)
+    }
+    
+    // Other methods...
+}
+```
+
+---
+
+## Creating Basic Mappings
+
+Let's start with some simple mappings to get familiar with the library.
+
+### Simple Field Mapping
+
+To map fields directly from source to target:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .withFormat(Format.JSON)
+    .to("user")
+    .map("name").to("fullName")
+    .map("email").to("contactEmail")
+    .build()
+
+val customerJson = """
+    {
+        "name": "John Doe",
+        "email": "john@example.com",
+        "age": 30
+    }
+"""
+
+val result = mapping.executeToJson(customerJson)
+println(result)
+```
+
+This will produce:
+```json
+{
+    "fullName": "John Doe",
+    "contactEmail": "john@example.com"
+}
+```
+
+### Mapping with Transformations
+
+You can transform values during mapping:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .to("user")
+    .map("name").transform { it.toString().uppercase() }.to("fullName")
+    .map("age").transform { (it as Number).toInt() * 2 }.to("doubledAge")
+    .build()
+```
+
+### Mapping Nested Fields
+
+You can access nested fields with dot notation:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .to("user")
+    .map("address.street").to("streetAddress")
+    .map("address.city").to("city")
+    .build()
+```
+
+### Creating Nested Structures
+
+You can create nested structures in the target:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .to("user")
+    .map("email").to("contact.email")
+    .map("phone").to("contact.phoneNumber")
+    .build()
+```
+
+This will produce a nested "contact" object with "email" and "phoneNumber" fields.
+
+---
+
+## Advanced Mapping Features
+
+### Conditional Mapping with Branches
+
+Use branches to apply different mappings based on conditions:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .to("processedCustomer")
+    .branch()
+        .when { source -> (source as? Map<*, *>)?.get("age") as? Int ?: 0 >= 18 }
+        .then()
+            .map("name").to("adultName")
+            .map("status").transform { "adult" }.to("customerType")
+        .endBranch()
+        .otherwise()
+            .map("name").to("minorName")
+            .map("status").transform { "minor" }.to("customerType")
+        .endBranch()
+    .end()
+    .build()
+```
+
+### Collection Processing with ForEach
+
+Process collections with the `forEach` feature:
+
+```kotlin
+val mapping = Platymap.flow("order")
+    .to("processedOrder")
+    .map("orderId").to("id")
+    .forEach("items")
+        .`as`("item")
+        .create("processedItems")
+            .map("$item.name").to("productName")
+            .map("$item.quantity").to("qty")
+            .map("$item.price").to("unitPrice")
+        .end()
+    .end()
+    .build()
+```
+
+**Note**: In Kotlin, `as` is a reserved keyword for type casting. To use it as a method name, we need to surround it with backticks: `` `as` ``.
+
+### Bulk Mapping
+
+Map multiple fields at once with pattern matching:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .to("user")
+    .mapAll("personal.*")
+        .to("profile")
+        .end()
+    .build()
+```
+
+This maps all fields under "personal" to the "profile" object in the target. For example, "personal.firstName" becomes "profile.firstName".
+
+You can exclude specific fields:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .to("user")
+    .mapAll("personal.*")
+        .excluding("personal.ssn", "personal.password")
+        .to("profile")
+        .end()
+    .build()
+```
+
+Or include only specific fields:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .to("user")
+    .mapAll("personal.*")
+        .including("personal.firstName", "personal.lastName")
+        .to("profile")
+        .end()
+    .build()
+```
+
+### Nesting Flat Fields
+
+The `nest` operation transforms flat fields into nested structures:
+
+```kotlin
+val mapping = Platymap.flow("flatCustomer")
+    .to("nestedCustomer")
+    .nest("address.*")
+        .asObject("address")
+        .to("contact")
+    .build()
+```
+
+This transforms:
+```json
+{
+    "address.street": "123 Main St",
+    "address.city": "Anytown",
+    "address.zip": "12345"
+}
+```
+
+Into:
+```json
+{
+    "contact": {
+        "address": {
+            "street": "123 Main St",
+            "city": "Anytown",
+            "zip": "12345"
+        }
+    }
+}
+```
+
+You can also create a collection of objects:
+
+```kotlin
+val mapping = Platymap.flow("flatCustomer")
+    .to("nestedCustomer")
+    .nest("phones.*")
+        .asCollection("phoneNumbers")
+        .to("contact")
+    .build()
+```
+
+This transforms:
+```json
+{
+    "phones.home": "555-1234",
+    "phones.work": "555-5678",
+    "phones.mobile": "555-9012"
+}
+```
+
+Into:
+```json
+{
+    "contact": {
+        "phoneNumbers": [
+            { "name": "home", "value": "555-1234" },
+            { "name": "work", "value": "555-5678" },
+            { "name": "mobile", "value": "555-9012" }
+        ]
+    }
+}
+```
+
+### Flattening Nested Structures
+
+The `flatten` operation does the opposite of nesting, transforming nested structures into flat fields:
+
+```kotlin
+val mapping = Platymap.flow("nestedCustomer")
+    .to("flatCustomer")
+    .flatten("contact.address")
+        .withPrefix("address_")
+        .to("")
+        .end()
+    .build()
+```
+
+This transforms:
+```json
+{
+    "contact": {
+        "address": {
+            "street": "123 Main St",
+            "city": "Anytown",
+            "zip": "12345"
+        }
+    }
+}
+```
+
+Into:
+```json
+{
+    "address_street": "123 Main St",
+    "address_city": "Anytown",
+    "address_zip": "12345"
+}
+```
+
+### Custom Functions
+
+You can define and use custom functions for more complex transformations:
+
+```kotlin
+// Register a custom function
+FunctionRegistry.register(
+    MapFunction("formatPhoneNumber", listOf("phone")) { args ->
+        val phone = args[0]?.toString() ?: ""
+        if (phone.length == 10) {
+            "(${phone.substring(0, 3)}) ${phone.substring(3, 6)}-${phone.substring(6)}"
+        } else {
+            phone
+        }
+    }
+)
+
+// Use the function in a mapping
+val mapping = Platymap.flow("customer")
+    .to("user")
+    .map("phone").transform { phone ->
+        FunctionRegistry.call("formatPhoneNumber", phone)
+    }.to("formattedPhone")
+    .build()
+```
+
+### Type-Safe Mappings for Java Beans
+
+For Java beans, you can use type-safe mappings:
+
+```kotlin
+data class Customer(val id: Long, val name: String, val email: String)
+data class UserDTO(var userId: Long = 0, var fullName: String = "", var contactEmail: String = "")
+
+val mapping = Platymap
+    .flow(Customer::class.java)
+    .to(UserDTO::class.java)
+    .map { it.id }.to { dto, value -> dto.userId = value }
+    .map { it.name }.to { dto, value -> dto.fullName = value }
+    .map { it.email }.to { dto, value -> dto.contactEmail = value }
+    .build()
+
+val customer = Customer(1, "John Doe", "john@example.com")
+val userDTO = mapping.execute(customer)
+```
