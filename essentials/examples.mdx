@@ -1,0 +1,352 @@
+---
+title: "Complete Example"
+description: "On this page, you'll find a comprehensive example that demonstrates many of PlatyMap's capabilities."
+icon: "map"
+---
+
+## Appendix: Complete Example
+
+Here's a complete example that demonstrates many of the features of PlatyMap:
+
+```kotlin
+import xyz.mahmoudahmed.adapter.DataNode
+import xyz.mahmoudahmed.dsl.core.*
+import xyz.mahmoudahmed.dsl.builders.*
+import xyz.mahmoudahmed.dsl.collections.*
+import xyz.mahmoudahmed.dsl.conditional.*
+import xyz.mahmoudahmed.dsl.functions.*
+import xyz.mahmoudahmed.dsl.structure.*
+
+fun main() {
+    // Register custom functions
+    registerCustomFunctions()
+    
+    // Create a mapping for order processing
+    val orderProcessingMapping = createOrderProcessingMapping()
+    
+    // Sample order data
+    val orderJson = """
+    {
+        "order": {
+            "id": "ORD-12345",
+            "date": "2023-09-15T10:30:00Z",
+            "customer": {
+                "id": "CUST-789",
+                "name": "Jane Smith",
+                "email": "jane@example.com",
+                "phone": "5551234567",
+                "address": {
+                    "street": "123 Main St",
+                    "city": "Anytown",
+                    "state": "CA",
+                    "zip": "12345",
+                    "country": "USA"
+                }
+            },
+            "items": [
+                {
+                    "sku": "PROD-001",
+                    "name": "Smartphone",
+                    "price": 699.99,
+                    "quantity": 1,
+                    "category": "Electronics"
+                },
+                {
+                    "sku": "PROD-002",
+                    "name": "Wireless Earbuds",
+                    "price": 129.99,
+                    "quantity": 1,
+                    "category": "Electronics"
+                },
+                {
+                    "sku": "PROD-003",
+                    "name": "Phone Case",
+                    "price": 24.99,
+                    "quantity": 2,
+                    "category": "Accessories"
+                }
+            ],
+            "payment": {
+                "method": "credit_card",
+                "card_type": "Visa",
+                "last_four": "4242",
+                "status": "completed"
+            },
+            "shipping": {
+                "method": "express",
+                "tracking_number": "TRK987654321",
+                "estimated_delivery": "2023-09-18"
+            },
+            "subtotal": 879.96,
+            "tax": 72.59,
+            "shipping_cost": 15.00,
+            "discount": 10.00,
+            "total": 957.55
+        }
+    }
+    """.trimIndent()
+    
+    // Execute the mapping
+    try {
+        val result = orderProcessingMapping.executeToJson(orderJson)
+        println("Order Processing Result:")
+        println(result)
+    } catch (e: MappingExecutionException) {
+        println("Error processing order: ${e.message}")
+        e.printStackTrace()
+    }
+}
+
+fun registerCustomFunctions() {
+    // Format currency
+    Platymap.function("formatCurrency")
+        .with("amount", "currencyCode")
+        .body { args ->
+            val amount = args[0] as? Number ?: 0.0
+            val currencyCode = args[1] as? String ?: "USD"
+            
+            val symbol = when (currencyCode) {
+                "USD" -> "$"
+                "EUR" -> "€"
+                "GBP" -> "£"
+                else -> currencyCode
+            }
+            
+            "$symbol${String.format("%.2f", amount.toDouble())}"
+        }
+        .build()
+    
+    // Format date
+    Platymap.function("formatDate")
+        .with("date", "pattern")
+        .body { args ->
+            val date = args[0] as? String ?: return@body null
+            val pattern = args[1] as? String ?: "MM/dd/yyyy"
+            
+            try {
+                val inputFormat = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+                val outputFormat = java.text.SimpleDateFormat(pattern)
+                val parsedDate = inputFormat.parse(date)
+                outputFormat.format(parsedDate)
+            } catch (e: Exception) {
+                "Invalid Date"
+            }
+        }
+        .build()
+    
+    // Format phone number
+    Platymap.function("formatPhone")
+        .with("phone")
+        .body { args ->
+            val phone = args[0] as? String ?: return@body null
+            val digitsOnly = phone.replace(Regex("\\D"), "")
+            
+            if (digitsOnly.length == 10) {
+                "(${digitsOnly.substring(0, 3)}) ${digitsOnly.substring(3, 6)}-${digitsOnly.substring(6)}"
+            } else {
+                phone
+            }
+        }
+        .build()
+}
+
+fun createOrderProcessingMapping(): Mapping {
+    return Platymap.flow("order")
+        .withFormat(Format.JSON)
+        .to("processedOrder")
+        .withFormat(Format.JSON)
+        
+        // Basic order information
+        .map("order.id").to("orderInfo.orderId")
+        .map("order.date").transform { date ->
+            FunctionRegistry.call("formatDate", date, "MM/dd/yyyy")
+        }.to("orderInfo.orderDate")
+        
+        // Customer information
+        .map("order.customer.name").to("customer.name")
+        .map("order.customer.email").to("customer.email")
+        .map("order.customer.phone").transform { phone ->
+            FunctionRegistry.call("formatPhone", phone)
+        }.to("customer.phoneFormatted")
+        
+        // Format and structure the address
+        .map("order.customer.address").transform { address ->
+            if (address is DataNode.ObjectNode) {
+                val street = address.get("street")?.toString() ?: ""
+                val city = address.get("city")?.toString() ?: ""
+                val state = address.get("state")?.toString() ?: ""
+                val zip = address.get("zip")?.toString() ?: ""
+                "$street, $city, $state $zip"
+            } else {
+                "No address provided"
+            }
+        }.to("customer.formattedAddress")
+        
+        // Process items with forEach
+        .forEach("order.items")
+            .`as`("item")
+            .create("items")
+                .map("$item.sku").to("productId")
+                .map("$item.name").to("productName")
+                .map("$item.price").transform { price ->
+                    FunctionRegistry.call("formatCurrency", price, "USD")
+                }.to("unitPrice")
+                .map("$item.quantity").to("quantity")
+                .map("$item.price").transform { price ->
+                    val quantity = context.getValueByPath("$item.quantity") as? Number ?: 1
+                    val priceValue = (price as? Number)?.toDouble() ?: 0.0
+                    priceValue * quantity.toDouble()
+                }.to("totalPrice")
+                
+                // Conditional processing based on category
+                .branch()
+                    .when { item ->
+                        val category = (item as? DataNode)?.get("category")?.toString()
+                        category == "Electronics"
+                    }
+                    .then()
+                        .map("$item.warranty").transform { "Available" }.to("warrantyStatus")
+                        .map("productType").transform { "Electronic Device" }.to("productType")
+                    .endBranch()
+                    .when { item ->
+                        val category = (item as? DataNode)?.get("category")?.toString()
+                        category == "Accessories"
+                    }
+                    .then()
+                        .map("$item.warranty").transform { "Not Available" }.to("warrantyStatus")
+                        .map("productType").transform { "Accessory" }.to("productType")
+                    .endBranch()
+                    .otherwise()
+                        .map("$item.warranty").transform { "Unknown" }.to("warrantyStatus")
+                        .map("productType").transform { "Other" }.to("productType")
+                    .endBranch()
+                .end()
+            .end()
+        .end()
+        
+        // Payment information with conditional processing
+        .branch()
+            .when { source ->
+                val method = (source as? DataNode)?.get("order")?.get("payment")?.get("method")?.toString()
+                method == "credit_card"
+            }
+            .then()
+                .map("order.payment.card_type").to("payment.type")
+                .map("order.payment.last_four").transform { lastFour ->
+                    "xxxx-xxxx-xxxx-$lastFour"
+                }.to("payment.cardNumber")
+                .map("paymentMethod").transform { "Credit Card" }.to("payment.method")
+            .endBranch()
+            .otherwise()
+                .map("order.payment.method").to("payment.method")
+                .map("paymentDetails").transform { "Alternative payment method" }.to("payment.details")
+            .endBranch()
+        .end()
+        
+        // Order totals with formatting
+        .map("order.subtotal").transform { subtotal ->
+            FunctionRegistry.call("formatCurrency", subtotal, "USD")
+        }.to("totals.subtotal")
+        
+        .map("order.tax").transform { tax ->
+            FunctionRegistry.call("formatCurrency", tax, "USD")
+        }.to("totals.tax")
+        
+        .map("order.shipping_cost").transform { shipping ->
+            FunctionRegistry.call("formatCurrency", shipping, "USD")
+        }.to("totals.shipping")
+        
+        .map("order.discount").transform { discount ->
+            FunctionRegistry.call("formatCurrency", discount, "USD")
+        }.to("totals.discount")
+        
+        .map("order.total").transform { total ->
+            FunctionRegistry.call("formatCurrency", total, "USD")
+        }.to("totals.grandTotal")
+        
+        // Metadata
+        .map("processedAt").transform { 
+            java.time.LocalDateTime.now().toString() 
+        }.to("metadata.processedAt")
+        
+        .map("source").transform { "API" }.to("metadata.source")
+        
+        .build()
+}
+```
+
+This complete example demonstrates:
+1. Custom function registration
+2. Complex mapping with conditional logic
+3. Collection processing with forEach
+4. Deep path access for nested properties
+5. Data transformation and formatting
+6. Error handling with try-catch
+
+The resulting JSON would look something like this:
+
+```json
+{
+  "orderInfo": {
+    "orderId": "ORD-12345",
+    "orderDate": "09/15/2023"
+  },
+  "customer": {
+    "name": "Jane Smith",
+    "email": "jane@example.com",
+    "phoneFormatted": "(555) 123-4567",
+    "formattedAddress": "123 Main St, Anytown, CA 12345"
+  },
+  "items": [
+    {
+      "productId": "PROD-001",
+      "productName": "Smartphone",
+      "unitPrice": "$699.99",
+      "quantity": 1,
+      "totalPrice": 699.99,
+      "warrantyStatus": "Available",
+      "productType": "Electronic Device"
+    },
+    {
+      "productId": "PROD-002",
+      "productName": "Wireless Earbuds",
+      "unitPrice": "$129.99",
+      "quantity": 1,
+      "totalPrice": 129.99,
+      "warrantyStatus": "Available",
+      "productType": "Electronic Device"
+    },
+    {
+      "productId": "PROD-003",
+      "productName": "Phone Case",
+      "unitPrice": "$24.99",
+      "quantity": 2,
+      "totalPrice": 49.98,
+      "warrantyStatus": "Not Available",
+      "productType": "Accessory"
+    }
+  ],
+  "payment": {
+    "type": "Visa",
+    "cardNumber": "xxxx-xxxx-xxxx-4242",
+    "method": "Credit Card"
+  },
+  "totals": {
+    "subtotal": "$879.96",
+    "tax": "$72.59",
+    "shipping": "$15.00",
+    "discount": "$10.00",
+    "grandTotal": "$957.55"
+  },
+  "metadata": {
+    "processedAt": "2023-09-20T14:30:45.123456",
+    "source": "API"
+  }
+}
+```
+
+---
+
+
+
+

@@ -28,7 +28,7 @@
               "essentials/architecture",
               "essentials/extend",
               "essentials/debug",
-              "essentials/navigation",
+              "essentials/examples",
               "essentials/reusable-snippets"
             ] 
           }
