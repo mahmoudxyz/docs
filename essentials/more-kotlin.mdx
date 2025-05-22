@@ -1,0 +1,906 @@
+---
+title: Reusable Snippets
+description: "On this page, we’ll explore the most important Kotlin features used in PlatyMap—those worth focusing on—alongside key design patterns implemented in Kotlin."
+icon: 'recycle'
+---
+
+## Appendix: Kotlin Syntax Cheat Sheet
+
+### Basic Syntax
+
+```kotlin
+// Variables
+val immutable: String = "Can't change"
+var mutable: Int = 42
+mutable = 43  // OK
+
+// Type inference
+val inferredString = "Kotlin knows this is a String"
+
+// Functions
+fun add(a: Int, b: Int): Int {
+    return a + b
+}
+
+// Single-expression functions
+fun subtract(a: Int, b: Int) = a - b
+
+// Default parameters
+fun greet(name: String = "World") = "Hello, $name!"
+
+// Named arguments
+greet(name = "Kotlin")
+```
+
+### Control Flow
+
+```kotlin
+// If expression
+val max = if (a > b) a else b
+
+// When expression
+val description = when (value) {
+    0 -> "Zero"
+    1, 2 -> "One or Two"
+    in 3..10 -> "Between 3 and 10"
+    is String -> "It's a string"
+    else -> "Something else"
+}
+
+// For loop
+for (i in 1..10) {
+    println(i)
+}
+
+// While loop
+while (condition) {
+    // Do something
+}
+
+// Do-while loop
+do {
+    // Do something
+} while (condition)
+```
+
+### Null Safety
+
+```kotlin
+// Nullable types
+var nullable: String? = "Can be null"
+nullable = null  // OK
+
+// Safe call
+val length = nullable?.length  // Returns null if nullable is null
+
+// Elvis operator
+val nonNullLength = nullable?.length ?: 0  // Provides default if null
+
+// Non-null assertion
+val definitelyNonNull = nullable!!  // Throws NPE if null
+```
+
+### Collections
+
+```kotlin
+// Lists
+val readOnlyList = listOf("a", "b", "c")  // Immutable list
+val mutableList = mutableListOf("a", "b", "c")  // Mutable list
+mutableList.add("d")  // OK
+
+// Maps
+val readOnlyMap = mapOf("key1" to "value1", "key2" to "value2")  // Immutable map
+val mutableMap = mutableMapOf("key1" to "value1")  // Mutable map
+mutableMap["key2"] = "value2"  // Add/update entries
+
+// Sets
+val readOnlySet = setOf("a", "b", "c")  // Immutable set
+val mutableSet = mutableSetOf("a", "b", "c")  // Mutable set
+mutableSet.add("d")  // OK
+
+// Collection operations
+val filteredList = list.filter { it.length > 3 }
+val mappedList = list.map { it.uppercase() }
+val anyMatch = list.any { it.startsWith("a") }
+val allMatch = list.all { it.isNotEmpty() }
+val firstMatch = list.first { it.length > 3 }
+val sumOfLengths = list.sumOf { it.length }
+```
+
+### Classes and Objects
+
+```kotlin
+// Basic class
+class Person(val name: String, var age: Int)
+
+// Instantiating a class (no 'new' keyword)
+val person = Person("John", 30)
+
+// Data class
+data class Customer(val id: Int, val name: String, val email: String)
+
+// Inheritance
+open class Animal(val name: String) {  // 'open' allows inheritance
+    open fun makeSound() {  // 'open' allows overriding
+        println("Some generic sound")
+    }
+}
+
+class Dog(name: String) : Animal(name) {  // Inherits from Animal
+    override fun makeSound() {  // Overrides the parent method
+        println("Woof!")
+    }
+}
+
+// Object (singleton)
+object Logger {
+    fun log(message: String) {
+        println("LOG: $message")
+    }
+}
+
+// Companion object (similar to static members)
+class Factory {
+    companion object {
+        fun create(): Factory = Factory()
+    }
+}
+
+// Extension functions
+fun String.addExclamation(): String = "$this!"
+```
+
+### Functional Programming
+
+```kotlin
+// Lambda expressions
+val sum = { x: Int, y: Int -> x + y }
+val result = sum(3, 5)  // 8
+
+// Function types
+val transform: (String) -> Int = { it.length }
+val lengths = listOf("a", "ab", "abc").map(transform)  // [1, 2, 3]
+
+// Higher-order functions (functions that take/return functions)
+fun operation(x: Int, y: Int, op: (Int, Int) -> Int): Int {
+    return op(x, y)
+}
+val result = operation(5, 3) { a, b -> a + b }  // 8
+
+// Lambda with receiver
+val isLong: String.() -> Boolean = { length > 5 }
+val result = "Hello, World".isLong()  // true
+```
+
+### Scope Functions
+
+```kotlin
+// let - execute a block with the object as 'it'
+val length = str?.let { it.length }
+
+// with - use object properties without repeatedly referring to the object
+with(person) {
+    println(name)
+    println(age)
+}
+
+// run - like 'with' but as an extension function
+val result = person.run {
+    println(name)
+    age * 2  // returns this value
+}
+
+// apply - configure an object and return it
+val person = Person("John", 30).apply {
+    age = 31  // modify the object
+}
+
+// also - do something with an object, return the object
+val person = getPerson().also {
+    println("Got person: ${it.name}")
+}
+```
+
+### Coroutines
+
+```kotlin
+// Basic coroutine
+suspend fun fetchData(): Data {
+    delay(1000)  // Non-blocking delay
+    return Data()
+}
+
+// Launching a coroutine
+fun startFetching() {
+    GlobalScope.launch {
+        val data = fetchData()  // Suspends the coroutine, not the thread
+        processData(data)
+    }
+}
+
+// Structured concurrency
+fun loadData() = runBlocking {
+    val data1 = async { fetchData1() }  // Start async operation
+    val data2 = async { fetchData2() }  // Start another async operation
+    processData(data1.await(), data2.await())  // Wait for both to complete
+}
+```
+
+### Type-Safe Builders (DSL)
+
+```kotlin
+// Example of how Kotlin enables DSLs
+fun html(init: HTML.() -> Unit): HTML {
+    val html = HTML()
+    html.init()
+    return html
+}
+
+class HTML {
+    var body: Body? = null
+    
+    fun body(init: Body.() -> Unit) {
+        val body = Body()
+        body.init()
+        this.body = body
+    }
+}
+
+class Body {
+    var text = ""
+    
+    fun p(init: P.() -> Unit) {
+        val p = P()
+        p.init()
+        // Add paragraph to body
+    }
+}
+
+class P {
+    var text = ""
+}
+
+// Using the DSL
+val document = html {
+    body {
+        p {
+            text = "Hello, World!"
+        }
+    }
+}
+```
+
+---
+
+## Appendix: Common Design Patterns in Kotlin
+
+### Singleton
+
+```kotlin
+// Using object declaration
+object Singleton {
+    fun doSomething() {
+        // Implementation
+    }
+}
+
+// Usage
+Singleton.doSomething()
+```
+
+### Factory Method
+
+```kotlin
+interface Product {
+    fun operation(): String
+}
+
+class ConcreteProductA : Product {
+    override fun operation() = "Product A"
+}
+
+class ConcreteProductB : Product {
+    override fun operation() = "Product B"
+}
+
+object ProductFactory {
+    fun createProduct(type: String): Product {
+        return when (type) {
+            "A" -> ConcreteProductA()
+            "B" -> ConcreteProductB()
+            else -> throw IllegalArgumentException("Unknown product type")
+        }
+    }
+}
+```
+
+### Builder
+
+```kotlin
+class Email private constructor(
+    val to: String,
+    val cc: List<String>,
+    val subject: String,
+    val body: String
+) {
+    class Builder {
+        private var to: String = ""
+        private var cc: List<String> = emptyList()
+        private var subject: String = ""
+        private var body: String = ""
+        
+        fun to(to: String) = apply { this.to = to }
+        fun cc(cc: List<String>) = apply { this.cc = cc }
+        fun subject(subject: String) = apply { this.subject = subject }
+        fun body(body: String) = apply { this.body = body }
+        
+        fun build(): Email {
+            require(to.isNotEmpty()) { "Email must have a recipient" }
+            return Email(to, cc, subject, body)
+        }
+    }
+}
+
+// Usage
+val email = Email.Builder()
+    .to("john@example.com")
+    .subject("Hello")
+    .body("This is a test email")
+    .build()
+```
+
+### Observer
+
+```kotlin
+interface Observer {
+    fun update(data: Any)
+}
+
+class ConcreteObserver(private val name: String) : Observer {
+    override fun update(data: Any) {
+        println("$name received update: $data")
+    }
+}
+
+class Subject {
+    private val observers = mutableListOf<Observer>()
+    
+    fun addObserver(observer: Observer) {
+        observers.add(observer)
+    }
+    
+    fun removeObserver(observer: Observer) {
+        observers.remove(observer)
+    }
+    
+    fun notifyObservers(data: Any) {
+        observers.forEach { it.update(data) }
+    }
+}
+```
+
+### Strategy
+
+```kotlin
+interface PaymentStrategy {
+    fun pay(amount: Int): Boolean
+}
+
+class CreditCardStrategy(
+    private val cardNumber: String,
+    private val expiryDate: String,
+    private val cvv: String
+) : PaymentStrategy {
+    override fun pay(amount: Int): Boolean {
+        // Process credit card payment
+        println("Paid $amount using Credit Card")
+        return true
+    }
+}
+
+class PayPalStrategy(
+    private val email: String,
+    private val password: String
+) : PaymentStrategy {
+    override fun pay(amount: Int): Boolean {
+        // Process PayPal payment
+        println("Paid $amount using PayPal")
+        return true
+    }
+}
+
+class ShoppingCart {
+    private var paymentStrategy: PaymentStrategy? = null
+    private val items = mutableListOf<Item>()
+    
+    fun setPaymentStrategy(paymentStrategy: PaymentStrategy) {
+        this.paymentStrategy = paymentStrategy
+    }
+    
+    fun addItem(item: Item) {
+        items.add(item)
+    }
+    
+    fun checkout(): Boolean {
+        val total = items.sumOf { it.price }
+        return paymentStrategy?.pay(total) ?: false
+    }
+}
+
+data class Item(val name: String, val price: Int)
+```
+
+---
+
+
+## Appendix: Step-by-Step Implementation Guide
+
+If you're new to Kotlin and need to extend the PlatyMap library, here's a step-by-step guide to implementing a new feature:
+
+### Step 1: Understand the Requirement
+
+Let's say we want to add a new feature to convert temperature units (Celsius to Fahrenheit and vice versa).
+
+### Step 2: Identify Where to Extend
+
+We need to create:
+1. A new `TemperatureConversionRule` class that implements `MappingRule`
+2. A new builder to construct this rule
+3. Extension methods on `TargetBuilder` to use this feature
+
+### Step 3: Implement the Mapping Rule
+
+```kotlin
+package xyz.mahmoudahmed.dsl.custom
+
+import xyz.mahmoudahmed.adapter.DataNode
+import xyz.mahmoudahmed.dsl.core.MappingContext
+import xyz.mahmoudahmed.dsl.core.MappingRule
+import xyz.mahmoudahmed.dsl.core.SimpleMapping
+
+/**
+ * Rule for converting temperature between different units.
+ */
+class TemperatureConversionRule(
+    private val sourcePath: String,
+    private val targetPath: String,
+    private val sourceUnit: TemperatureUnit,
+    private val targetUnit: TemperatureUnit
+) : MappingRule {
+    
+    override fun apply(context: MappingContext, target: Any) {
+        // Get the source value
+        val sourceValue = context.getValueByPath(sourcePath)
+        
+        // Convert only if we have a number
+        if (sourceValue is Number) {
+            val sourceTemp = sourceValue.toDouble()
+            val convertedTemp = convertTemperature(sourceTemp, sourceUnit, targetUnit)
+            
+            // Set the converted value
+            if (target is DataNode.ObjectNode) {
+                SimpleMapping.setValueInDataNode(target, targetPath, convertedTemp)
+            }
+        }
+    }
+    
+    private fun convertTemperature(
+        value: Double, 
+        fromUnit: TemperatureUnit, 
+        toUnit: TemperatureUnit
+    ): Double {
+        return when {
+            fromUnit == toUnit -> value
+            fromUnit == TemperatureUnit.CELSIUS && toUnit == TemperatureUnit.FAHRENHEIT -> 
+                (value * 9/5) + 32
+            fromUnit == TemperatureUnit.FAHRENHEIT && toUnit == TemperatureUnit.CELSIUS -> 
+                (value - 32) * 5/9
+            fromUnit == TemperatureUnit.CELSIUS && toUnit == TemperatureUnit.KELVIN -> 
+                value + 273.15
+            fromUnit == TemperatureUnit.KELVIN && toUnit == TemperatureUnit.CELSIUS -> 
+                value - 273.15
+            fromUnit == TemperatureUnit.FAHRENHEIT && toUnit == TemperatureUnit.KELVIN -> 
+                (value - 32) * 5/9 + 273.15
+            fromUnit == TemperatureUnit.KELVIN && toUnit == TemperatureUnit.FAHRENHEIT -> 
+                (value - 273.15) * 9/5 + 32
+            else -> throw IllegalArgumentException("Unsupported conversion: $fromUnit to $toUnit")
+        }
+    }
+}
+
+/**
+ * Temperature units supported by the converter.
+ */
+enum class TemperatureUnit {
+    CELSIUS,
+    FAHRENHEIT,
+    KELVIN
+}
+```
+
+### Step 4: Create a Builder for the New Feature
+
+```kotlin
+package xyz.mahmoudahmed.dsl.custom
+
+import xyz.mahmoudahmed.dsl.builders.TargetBuilder
+
+/**
+ * Builder for configuring temperature conversion.
+ */
+class TemperatureConversionBuilder(
+    private val parent: TargetBuilder,
+    private val sourcePath: String,
+    private val sourceUnit: TemperatureUnit
+) {
+    /**
+     * Specify the target temperature unit.
+     *
+     * @param targetUnit The unit to convert to
+     * @return Builder for specifying the target path
+     */
+    fun to(targetUnit: TemperatureUnit): TemperatureTargetBuilder {
+        return TemperatureTargetBuilder(parent, sourcePath, sourceUnit, targetUnit)
+    }
+}
+
+/**
+ * Builder for specifying the target path for temperature conversion.
+ */
+class TemperatureTargetBuilder(
+    private val parent: TargetBuilder,
+    private val sourcePath: String,
+    private val sourceUnit: TemperatureUnit,
+    private val targetUnit: TemperatureUnit
+) {
+    /**
+     * Specify the target path where the converted temperature will be stored.
+     *
+     * @param targetPath The path in the target object
+     * @return The parent target builder
+     */
+    fun at(targetPath: String): TargetBuilder {
+        val rule = TemperatureConversionRule(sourcePath, targetPath, sourceUnit, targetUnit)
+        parent.addRule(rule)
+        return parent
+    }
+}
+```
+
+### Step 5: Extend TargetBuilder with the New Feature
+
+```kotlin
+package xyz.mahmoudahmed.dsl.builders
+
+import xyz.mahmoudahmed.dsl.custom.TemperatureConversionBuilder
+import xyz.mahmoudahmed.dsl.custom.TemperatureUnit
+
+/**
+ * Extension functions for TargetBuilder to support temperature conversion.
+ */
+
+/**
+ * Starts a temperature conversion from Celsius.
+ *
+ * @param sourcePath The path to the temperature value in Celsius
+ * @return Builder for configuring the temperature conversion
+ */
+fun TargetBuilder.convertCelsius(sourcePath: String): TemperatureConversionBuilder {
+    return TemperatureConversionBuilder(this, sourcePath, TemperatureUnit.CELSIUS)
+}
+
+/**
+ * Starts a temperature conversion from Fahrenheit.
+ *
+ * @param sourcePath The path to the temperature value in Fahrenheit
+ * @return Builder for configuring the temperature conversion
+ */
+fun TargetBuilder.convertFahrenheit(sourcePath: String): TemperatureConversionBuilder {
+    return TemperatureConversionBuilder(this, sourcePath, TemperatureUnit.FAHRENHEIT)
+}
+
+/**
+ * Starts a temperature conversion from Kelvin.
+ *
+ * @param sourcePath The path to the temperature value in Kelvin
+ * @return Builder for configuring the temperature conversion
+ */
+fun TargetBuilder.convertKelvin(sourcePath: String): TemperatureConversionBuilder {
+    return TemperatureConversionBuilder(this, sourcePath, TemperatureUnit.KELVIN)
+}
+```
+
+### Step 6: Use the New Feature
+
+```kotlin
+// Create a mapping that uses the temperature conversion
+val weatherMapping = Platymap.flow("weatherData")
+    .to("processedWeather")
+    .map("location.name").to("city")
+    .map("location.country").to("country")
+    
+    // Use our new temperature conversion feature
+    .convertCelsius("temperature.current")
+        .to(TemperatureUnit.FAHRENHEIT)
+        .at("temperature.fahrenheit")
+        
+    .convertFahrenheit("temperature.fahrenheit")
+        .to(TemperatureUnit.KELVIN)
+        .at("temperature.kelvin")
+        
+    .build()
+
+// Sample weather data
+val weatherJson = """
+{
+    "location": {
+        "name": "London",
+        "country": "UK",
+        "coordinates": {
+            "latitude": 51.5074,
+            "longitude": -0.1278
+        }
+    },
+    "temperature": {
+        "current": 22.5,
+        "min": 19.2,
+        "max": 24.8
+    },
+    "conditions": "Partly Cloudy",
+    "humidity": 65,
+    "wind": {
+        "speed": 12,
+        "direction": "NW"
+    }
+}
+"""
+
+// Execute the mapping
+val result = weatherMapping.executeToJson(weatherJson)
+println(result)
+```
+
+This would produce:
+```json
+{
+  "city": "London",
+  "country": "UK",
+  "temperature": {
+    "fahrenheit": 72.5,
+    "kelvin": 295.65
+  }
+}
+```
+
+### Step 7: Add Tests
+
+```kotlin
+@Test
+fun testTemperatureConversion() {
+    // Create a simple mapping that uses temperature conversion
+    val mapping = Platymap.flow("source")
+        .to("target")
+        .convertCelsius("celsius")
+            .to(TemperatureUnit.FAHRENHEIT)
+            .at("fahrenheit")
+        .convertFahrenheit("fahrenheit")
+            .to(TemperatureUnit.CELSIUS)
+            .at("backToCelsius")
+        .build()
+    
+    // Test data
+    val sourceJson = """
+    {
+        "celsius": 25.0
+    }
+    """
+    
+    // Execute the mapping
+    val result = mapping.execute(sourceJson)
+    
+    // Verify results
+    val targetNode = result as DataNode.ObjectNode
+    val fahrenheit = targetNode.get("fahrenheit") as DataNode.NumberValue
+    val backToCelsius = targetNode.get("backToCelsius") as DataNode.NumberValue
+    
+    assertEquals(77.0, fahrenheit.value.toDouble(), 0.01)
+    assertEquals(25.0, backToCelsius.value.toDouble(), 0.01)
+}
+```
+
+---
+
+## Appendix: More Kotlin Tips
+
+### Working with Collections
+
+#### Collection Transformation
+
+```kotlin
+// Map: transform each element
+val numbers = listOf(1, 2, 3, 4, 5)
+val doubled = numbers.map { it * 2 }  // [2, 4, 6, 8, 10]
+
+// Filter: keep elements that match a condition
+val even = numbers.filter { it % 2 == 0 }  // [2, 4]
+
+// FlatMap: transform and flatten
+val nestedLists = listOf(listOf(1, 2), listOf(3, 4))
+val flattened = nestedLists.flatMap { it }  // [1, 2, 3, 4]
+
+// GroupBy: group elements by a key
+val people = listOf(Person("Alice", 29), Person("Bob", 31), Person("Charlie", 29))
+val byAge = people.groupBy { it.age }  // Map of age to lists of people
+
+// Partition: split into two lists based on a condition
+val (adults, minors) = people.partition { it.age >= 18 }
+```
+
+#### Collection Aggregation
+
+```kotlin
+// Sum of elements
+val sum = numbers.sum()  // 15
+
+// Sum of transformed elements
+val sumOfAges = people.sumOf { it.age }  // 89
+
+// Finding elements
+val first = numbers.first()  // 1
+val last = numbers.last()  // 5
+val firstEven = numbers.first { it % 2 == 0 }  // 2
+val noneMatch = numbers.none { it > 10 }  // true
+val anyMatch = numbers.any { it > 3 }  // true
+val allMatch = numbers.all { it < 10 }  // true
+
+// Reduce: combine elements starting from the first
+val product = numbers.reduce { acc, i -> acc * i }  // 120 (1*2*3*4*5)
+
+// Fold: combine elements with an initial value
+val sumPlusTen = numbers.fold(10) { acc, i -> acc + i }  // 25 (10+1+2+3+4+5)
+```
+
+### String Operations
+
+```kotlin
+// String templates
+val name = "John"
+val greeting = "Hello, $name!"  // "Hello, John!"
+val calculation = "2 + 2 = ${2 + 2}"  // "2 + 2 = 4"
+
+// Multiline strings
+val query = """
+    SELECT *
+    FROM users
+    WHERE name = 'John'
+    AND age > 18
+""".trimIndent()
+
+// String operations
+val uppercase = "hello".uppercase()  // "HELLO"
+val capitalized = "hello".replaceFirstChar { it.uppercase() }  // "Hello"
+val substring = "hello".substring(1, 4)  // "ell"
+val contains = "hello".contains("el")  // true
+val replaced = "hello".replace("l", "x")  // "hexxo"
+val split = "a,b,c".split(",")  // ["a", "b", "c"]
+```
+
+### Extension Functions and Properties
+
+```kotlin
+// Extension function
+fun String.removeWhitespace(): String {
+    return this.replace("\\s".toRegex(), "")
+}
+
+val text = "  Hello  World  "
+val withoutSpaces = text.removeWhitespace()  // "HelloWorld"
+
+// Extension property
+val String.lastChar: Char
+    get() = this[this.length - 1]
+
+val lastChar = "Hello".lastChar  // 'o'
+
+// Extension function with generic constraint
+fun <T : Comparable<T>> List<T>.findMinMax(): Pair<T, T>? {
+    if (isEmpty()) return null
+    val min = minOrNull() ?: return null
+    val max = maxOrNull() ?: return null
+    return min to max
+}
+
+val minMax = listOf(3, 1, 4, 1, 5, 9).findMinMax()  // Pair(1, 9)
+```
+
+### Higher-Order Functions
+
+```kotlin
+// Function that takes a function as a parameter
+fun operateOnNumbers(a: Int, b: Int, operation: (Int, Int) -> Int): Int {
+    return operation(a, b)
+}
+
+val sum = operateOnNumbers(5, 3) { x, y -> x + y }  // 8
+val product = operateOnNumbers(5, 3) { x, y -> x * y }  // 15
+
+// Function that returns a function
+fun createMultiplier(factor: Int): (Int) -> Int {
+    return { number -> number * factor }
+}
+
+val double = createMultiplier(2)
+val triple = createMultiplier(3)
+val result1 = double(10)  // 20
+val result2 = triple(10)  // 30
+
+// Function with a function type parameter and receiver
+fun buildString(action: StringBuilder.() -> Unit): String {
+    val sb = StringBuilder()
+    sb.action()
+    return sb.toString()
+}
+
+val message = buildString {
+    append("Hello, ")
+    append("World!")
+    append("\n")
+    append("How are you?")
+}
+```
+
+### Coroutines Basics
+
+```kotlin
+import kotlinx.coroutines.*
+
+// Basic coroutine
+fun main() = runBlocking {
+    launch {
+        delay(1000L)
+        println("World!")
+    }
+    println("Hello,")
+    delay(2000L)
+}
+
+// Async and await
+suspend fun fetchUserData(): String {
+    delay(1000L)
+    return "User data"
+}
+
+suspend fun fetchProductData(): String {
+    delay(1000L)
+    return "Product data"
+}
+
+fun main() = runBlocking {
+    val userDeferred = async { fetchUserData() }
+    val productDeferred = async { fetchProductData() }
+    
+    // Await both results (takes ~1000ms, not 2000ms)
+    val userData = userDeferred.await()
+    val productData = productDeferred.await()
+    
+    println("$userData and $productData")
+}
+
+// Error handling
+fun main() = runBlocking {
+    val job = launch {
+        try {
+            throw Exception("Coroutine failed")
+        } catch (e: Exception) {
+            println("Caught: ${e.message}")
+        }
+    }
+    job.join()
+}
+```
+
+---
+
+I hope this comprehensive documentation helps you understand and extend the PlatyMap library. Remember that learning takes time, so don't worry if everything doesn't make sense immediately. Take it step by step, and you'll gradually become comfortable with both Kotlin and the library's architecture.
+
+As you continue working with the library, keep referring back to this documentation, experiment with small examples, and don't hesitate to look up additional resources when needed. Good luck with your development
