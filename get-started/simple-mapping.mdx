@@ -1,0 +1,75 @@
+---
+title: 'Simple Mapping'
+description: 'Let's start with some simple mappings to get familiar with the library'
+---
+
+### Simple Field Mapping
+
+To map fields directly from source to target:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .withFormat(Format.JSON)
+    .to("user")
+    .map("name").to("fullName")
+    .map("email").to("contactEmail")
+    .build()
+
+val customerJson = """
+    {
+        "name": "John Doe",
+        "email": "john@example.com",
+        "age": 30
+    }
+"""
+
+val result = mapping.executeToJson(customerJson)
+println(result)
+```
+
+This will produce:
+
+```json
+{
+    "fullName": "John Doe",
+    "contactEmail": "john@example.com"
+}
+```
+
+### Mapping with Transformations
+
+You can transform values during mapping:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .to("user")
+    .map("name").transform { it.toString().uppercase() }.to("fullName")
+    .map("age").transform { (it as Number).toInt() * 2 }.to("doubledAge")
+    .build()
+```
+
+### Mapping Nested Fields
+
+You can access nested fields with dot notation:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .to("user")
+    .map("address.street").to("streetAddress")
+    .map("address.city").to("city")
+    .build()
+```
+
+### Creating Nested Structures
+
+You can create nested structures in the target:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .to("user")
+    .map("email").to("contact.email")
+    .map("phone").to("contact.phoneNumber")
+    .build()
+```
+
+This will produce a nested "contact" object with "email" and "phoneNumber" fields.

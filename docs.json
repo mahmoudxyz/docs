@@ -16,7 +16,9 @@
           {
             "group": "Get Started",
             "pages": [
-              "index"
+              "index",
+              "/get-started/simple-mapping",
+              "/get-started/advanced-mapping"
             ]
           },
           {
