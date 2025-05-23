@@ -31,6 +31,12 @@
               "essentials/examples",
               "essentials/more-kotlin"
             ] 
+          },
+          {
+            "group": "Contribute",
+            "pages": [
+              "step-by-step"
+            ]
           }
         ]
       }
