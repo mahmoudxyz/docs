@@ -1,0 +1,573 @@
+---
+title: 'Validation DSL User Guide'
+description: 'The PlatyMap Validation DSL provides a powerful, fluent API for validating data before, during, and after mapping operations. This guide will help you understand how to use the validation features to ensure your data meets all requirements.'
+---
+
+## Getting Started
+
+To start using the validation DSL, you first need to create a validator:
+
+```kotlin
+import xyz.mahmoudahmed.dsl.validation.*
+
+// Create a pre-validation validator
+val preValidator = ValidationDsl.preValidate {
+    // Validation rules go here
+}
+
+// Create an in-validation validator
+val inValidator = ValidationDsl.inValidate {
+    // Validation rules go here
+}
+
+// Create a post-validation validator
+val postValidator = ValidationDsl.postValidate {
+    // Validation rules go here
+}
+```
+
+## Basic Field Validation
+
+The most common validation is checking individual fields:
+
+```kotlin
+val userValidator = ValidationDsl.preValidate {
+    // Required field (must not be null)
+    validate("username")
+        .required()
+        .end()
+        
+    // String length validation
+    validate("name")
+        .required()
+        .minLength(2)
+        .maxLength(100)
+        .end()
+        
+    // Pattern matching with regex
+    validate("zipCode")
+        .pattern(Regex("^\\d{5}(-\\d{4})?$"))
+        .end()
+        
+    // Numeric value validation
+    validate("age")
+        .min(18)
+        .max(120)
+        .end()
+        
+    // Email validation
+    validate("email")
+        .required()
+        .email()
+        .end()
+        
+    // Date validation
+    validate("birthDate")
+        .date("yyyy-MM-dd")
+        .end()
+}
+```
+
+## Complex Validation Rules
+
+You can create more complex validation rules:
+
+```kotlin
+val orderValidator = ValidationDsl.preValidate {
+    // Custom validation with a predicate
+    validate("orderCode")
+        .custom(
+            predicate = { it?.toString()?.startsWith("ORD-") == true },
+            message = "Order code must start with 'ORD-'"
+        )
+        .end()
+        
+    // Allowed values (enum-like validation)
+    validate("status")
+        .allowedValues("NEW", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED")
+        .end()
+        
+    // Validate related fields as a group
+    validateGroup(
+        "subtotal", 
+        "tax", 
+        "total",
+        message = "Total must equal subtotal plus tax",
+        code = "TOTAL_MISMATCH"
+    ) { values ->
+        val subtotal = (values[0] as? Number)?.toDouble() ?: 0.0
+        val tax = (values[1] as? Number)?.toDouble() ?: 0.0
+        val total = (values[2] as? Number)?.toDouble() ?: 0.0
+        
+        // Allow small rounding differences
+        Math.abs((subtotal + tax) - total) < 0.01
+    }
+    
+    // Field required only when another field has specific value
+    validate("trackingNumber")
+        .requiredIf("status", "SHIPPED", "DELIVERED")
+        .end()
+}
+```
+
+## Conditional Validation
+
+Apply validation rules only when certain conditions are met:
+
+```kotlin
+val profileValidator = ValidationDsl.preValidate {
+    // Basic validation for everyone
+    validate("name").required().end()
+    validate("email").required().email().end()
+    
+    // Validate age only for specific countries
+    validate("age")
+        .required()
+        .min(18)
+        .`when` { data ->
+            val country = (data as? Map<*, *>)?.get("country")?.toString()
+            country == "US" || country == "CA"
+        }
+        .end()
+    
+    // Conditional block of validations
+    `when`(condition = { data ->
+        (data as? Map<*, *>)?.get("accountType")?.toString() == "BUSINESS"
+    }) {
+        validate("businessName").required().end()
+        validate("taxId").required().pattern(Regex("^\\d{2}-\\d{7}$")).end()
+        validate("industry").required().end()
+    }
+    
+    // Validation with different severity level
+    validate("phoneNumber")
+        .pattern(Regex("^\\+?[0-9]{10,15}$"))
+        .asWarning()  // This won't cause validation to fail
+        .end()
+}
+```
+
+## Collection Validation
+
+Validate collections and their items:
+
+```kotlin
+val orderValidator = ValidationDsl.preValidate {
+    // Validate the collection itself
+    validate("items")
+        .required()
+        .size(min = 1, max = 100)
+        .end()
+    
+    // Validate each item in a collection
+    forEach("items") {
+        validate("productId")
+            .required()
+            .pattern(Regex("^PROD-\\d+$"))
+            .end()
+            
+        validate("quantity")
+            .required()
+            .min(1)
+            .end()
+            
+        validate("price")
+            .required()
+            .min(0.01)
+            .end()
+    }
+    
+    // Validate all fields matching a pattern
+    validateAll("customer.preferences.*")
+        .required()
+        .end()
+}
+```
+
+## Validation Phases
+
+PlatyMap supports three validation phases:
+
+1. **Pre-Validation**: Validates source data before mapping
+   ```kotlin
+   val preValidator = ValidationDsl.preValidate {
+       // Validate source data
+   }
+   ```
+
+2. **In-Validation**: Validates during the mapping process
+   ```kotlin
+   val mapping = Platymap.flow("source")
+       .to("target")
+       .validateDuring {
+           // Validate during mapping
+       }
+       .build()
+   ```
+
+3. **Post-Validation**: Validates target data after mapping
+   ```kotlin
+   val postValidator = ValidationDsl.postValidate {
+       // Validate target data
+   }
+   ```
+
+## Integration with Mapping
+
+You can integrate validation with mapping in two ways:
+
+### Method 1: Separate Validation and Mapping
+
+```kotlin
+// Define validators
+val preValidator = ValidationDsl.preValidate { /* validation rules */ }
+val postValidator = ValidationDsl.postValidate { /* validation rules */ }
+
+// Define mapping
+val mapping = Platymap.flow("source")
+    .to("target")
+    .map("source.name").to("target.fullName")
+    // More mapping rules...
+    .build()
+
+// Create validated mapping
+val validatedMapping = createValidatedMapping(
+    mapping,
+    preValidator = preValidator,
+    postValidator = postValidator,
+    config = ValidationConfig(
+        failFast = false,
+        throwOnError = true,
+        includeWarnings = true
+    )
+)
+
+// Execute the validated mapping
+try {
+    val result = validatedMapping.executeToJson(sourceData)
+    println("Mapping successful")
+} catch (e: ValidationException) {
+    println("Validation failed: ${e.message}")
+    e.errors.forEach { error ->
+        println("- ${error.path}: ${error.message}")
+    }
+}
+```
+
+### Method 2: Fluent API Integration
+
+```kotlin
+// Define mapping with integrated validation
+val mapping = Platymap.flow("source")
+    .to("target")
+    
+    // Add pre-validation
+    .withPreValidation {
+        validate("source.id").required().end()
+        validate("source.email").email().end()
+    }
+    
+    // Define mapping rules
+    .map("source.id").to("target.id")
+    .map("source.email").to("target.contactEmail")
+    
+    // Add in-validation
+    .validateDuring {
+        validate("source.data").required().end()
+    }
+    
+    // More mapping rules
+    .map("source.data").to("target.info")
+    
+    // Add post-validation
+    .withPostValidation {
+        validate("target.id").required().end()
+        validate("target.contactEmail").required().email().end()
+    }
+    
+    // Build with validation
+    .buildWithValidation()
+
+// Execute the mapping
+try {
+    val result = mapping.executeToJson(sourceData)
+    println("Mapping successful")
+} catch (e: ValidationException) {
+    println("Validation failed")
+}
+```
+
+## Error Handling
+
+Validation produces `ValidationResult` objects that contain information about validation failures:
+
+```kotlin
+val validator = ValidationDsl.preValidate {
+    // Validation rules...
+}
+
+// Validate data
+val result = validator.validate(data)
+
+if (result.isValid) {
+    println("Validation passed!")
+} else {
+    println("Validation failed with ${result.errors.size} errors:")
+    
+    result.errors.forEach { error ->
+        println("Field: ${error.path}")
+        println("Message: ${error.message}")
+        println("Value: ${error.value}")
+        println("Code: ${error.code}")
+        println("Severity: ${error.severity}")
+        println()
+    }
+}
+```
+
+You can customize validation behavior with `ValidationConfig`:
+
+```kotlin
+val config = ValidationConfig(
+    failFast = true,         // Stop at first error
+    throwOnError = false,    // Don't throw exceptions
+    includeWarnings = true,  // Include warnings in result
+    includeInfos = false     // Exclude info messages
+)
+
+val result = validator.validate(data, config)
+```
+
+## Best Practices
+
+1. **Organize validators logically**: Group related validations together
+2. **Be specific with error messages**: Provide clear guidance on how to fix issues
+3. **Use appropriate severity levels**: Not all issues are errors
+4. **Validate at the right phase**: Use pre-validation for input data, post-validation for output data
+5. **Reuse validation logic**: Extract common validation patterns to functions
+
+## Complete Examples
+
+### Customer Registration Validation
+
+```kotlin
+val registrationValidator = ValidationDsl.preValidate {
+    // Personal information
+    validate("customer.firstName")
+        .required()
+        .minLength(2)
+        .maxLength(50)
+        .end()
+        
+    validate("customer.lastName")
+        .required()
+        .minLength(2)
+        .maxLength(50)
+        .end()
+        
+    validate("customer.email")
+        .required()
+        .email()
+        .end()
+        
+    validate("customer.password")
+        .required()
+        .minLength(8)
+        .custom(
+            predicate = { password ->
+                // Password must contain at least one uppercase letter, one lowercase letter,
+                // one digit, and one special character
+                val passwordStr = password.toString()
+                passwordStr.any { it.isUpperCase() } &&
+                passwordStr.any { it.isLowerCase() } &&
+                passwordStr.any { it.isDigit() } &&
+                passwordStr.any { !it.isLetterOrDigit() }
+            },
+            message = "Password must include uppercase, lowercase, digit, and special character"
+        )
+        .end()
+        
+    // Address validation
+    validate("customer.address.street")
+        .required()
+        .minLength(5)
+        .end()
+        
+    validate("customer.address.city")
+        .required()
+        .end()
+        
+    validate("customer.address.state")
+        .required()
+        .pattern(Regex("^[A-Z]{2}$"))
+        .end()
+        
+    validate("customer.address.zipCode")
+        .required()
+        .pattern(Regex("^\\d{5}(-\\d{4})?$"))
+        .end()
+        
+    // Payment information
+    `when`(condition = { data ->
+        (data as? Map<*, *>)?.get("paymentMethod")?.toString() == "CREDIT_CARD"
+    }) {
+        validate("paymentInfo.cardNumber")
+            .required()
+            .pattern(Regex("^\\d{16}$"))
+            .end()
+            
+        validate("paymentInfo.expiryDate")
+            .required()
+            .pattern(Regex("^(0[1-9]|1[0-2])/\\d{2}$"))
+            .end()
+            
+        validate("paymentInfo.cvv")
+            .required()
+            .pattern(Regex("^\\d{3,4}$"))
+            .end()
+    }
+    
+    // Marketing preferences
+    validate("preferences.receiveNewsletter")
+        .custom(
+            predicate = { it is Boolean },
+            message = "Receive newsletter preference must be a boolean"
+        )
+        .asWarning()
+        .end()
+}
+
+// Sample usage
+val customerData = mapOf(
+    "customer" to mapOf(
+        "firstName" to "John",
+        "lastName" to "Doe",
+        "email" to "john.doe@example.com",
+        "password" to "P@ssw0rd",
+        "address" to mapOf(
+            "street" to "123 Main St",
+            "city" to "Anytown",
+            "state" to "NY",
+            "zipCode" to "12345"
+        )
+    ),
+    "paymentMethod" to "CREDIT_CARD",
+    "paymentInfo" to mapOf(
+        "cardNumber" to "4111111111111111",
+        "expiryDate" to "12/25",
+        "cvv" to "123"
+    ),
+    "preferences" to mapOf(
+        "receiveNewsletter" to true
+    )
+)
+
+val result = registrationValidator.validate(customerData)
+if (result.isValid) {
+    // Process the registration
+    println("Registration is valid")
+} else {
+    // Handle validation errors
+    println("Registration has errors:")
+    result.errors.forEach { error ->
+        println("- ${error.path}: ${error.message}")
+    }
+}
+```
+
+### Order Processing with Validation and Mapping
+
+```kotlin
+// Create a complete order processing pipeline with validation
+val orderProcessing = Platymap.flow("order")
+    .withFormat(Format.JSON)
+    .to("processedOrder")
+    
+    // Pre-validate the order
+    .withPreValidation {
+        // Basic order validation
+        validate("order.id")
+            .required()
+            .pattern(Regex("^ORD-\\d+$"))
+            .end()
+            
+        validate("order.customer.id")
+            .required()
+            .end()
+            
+        validate("order.date")
+            .required()
+            .date("yyyy-MM-dd'T'HH:mm:ss'Z'")
+            .end()
+            
+        // Items validation
+        validate("order.items")
+            .required()
+            .size(min = 1)
+            .end()
+            
+        forEach("order.items") {
+            validate("productId")
+                .required()
+                .end()
+                
+            validate("quantity")
+                .required()
+                .min(1)
+                .end()
+                
+            validate("price")
+                .required()
+                .min(0.01)
+                .end()
+        }
+        
+        // Validate order total
+        validateGroup(
+            "order.subtotal",
+            "order.tax",
+            "order.total",
+            message = "Order total must equal subtotal plus tax"
+        ) { values ->
+            val subtotal = (values[0] as? Number)?.toDouble() ?: 0.0
+            val tax = (values[1] as? Number)?.toDouble() ?: 0.0
+            val total = (values[2] as? Number)?.toDouble() ?: 0.0
+            
+            Math.abs((subtotal + tax) - total) < 0.01
+        }
+    }
+    
+    // Mapping logic
+    .map("order.id").to("orderId")
+    .map("order.date").to("orderDate")
+    .map("order.customer.id").to("customerId")
+    .map("order.customer.name").to("customerName")
+    
+    // Map items with validation during mapping
+    .forEach("order.items")
+        .`as`("item")
+        .create("items")
+            .map("$item.productId").to("id")
+            .map("$item.name").to("description")
+            .map("$item.price").to("unitPrice")
+            .map("$item.quantity").to("quantity")
+            .map("$item.price").transform { price ->
+                val quantity = context.getValueByPath("$item.quantity") as? Number ?: 1
+                val priceValue = (price as? Number)?.toDouble() ?: 0.0
+                priceValue * quantity.toDouble()
+            }.to("totalPrice")
+        .end()
+    .end()
+    
+    // Additional validation during mapping
+    .validateDuring {
+        forEach("order.items") {
+            validateGroup(
+                "$item.price", 
+                "$item.quantity", 
+                "$item.totalPrice",
+                message = "Item totalPrice must equal price * quantity"
+            ) { values ->
+                val price = (values[0] as? Number)?.toDouble() ?: 0.0
+                val quantity = (values[1] as? Number)?.toInt() ?: 0
+                val totalPrice

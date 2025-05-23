@@ -18,7 +18,8 @@
             "pages": [
               "index",
               "/get-started/simple-mapping",
-              "/get-started/advanced-mapping"
+              "/get-started/advanced-mapping",
+               "/get-started/validation"
             ]
           },
           {
