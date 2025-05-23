@@ -1,0 +1,1525 @@
+---
+title: 'Validation Implementation Guide '
+description: 'This comprehensive guide is designed for developers who need to understand, maintain, extend, or debug the Validation DSL. Whether you're a junior developer learning the system or a senior developer extending it, this guide will help you understand the architecture, design patterns, and implementation details.'
+---
+
+
+## Architecture Overview
+
+The Validation DSL is built on a layered architecture with clear separation of concerns:
+
+1. **User Interface Layer**: The DSL builders that provide a fluent API
+2. **Rule Definition Layer**: The validators and rules that define validation logic
+3. **Execution Layer**: The context and execution engine that applies rules to data
+4. **Integration Layer**: Components that connect validation with the mapping system
+
+The system uses the **Command Pattern** for validation rules, the **Builder Pattern** for the DSL, and the **Composite Pattern** for combining validators.
+
+### Flow of Execution
+
+1. **Building Phase**: User creates validators using the DSL
+2. **Initialization Phase**: Validators are configured and rules are created
+3. **Execution Phase**: Rules are applied to data in a validation context
+4. **Result Phase**: Validation results are gathered and processed
+5. **Action Phase**: Based on results, the system either continues or reports errors
+
+## Core Concepts
+
+### Validator
+
+A `Validator` is responsible for validating a specific aspect of the data. It implements the `validate` method that checks a value against certain criteria and returns a `ValidationResult`.
+
+```kotlin
+interface Validator {
+    fun validate(context: ValidationContext, path: String): ValidationResult
+    
+    // Composition methods
+    infix fun and(other: Validator): Validator
+    infix fun or(other: Validator): Validator
+}
+```
+
+### ValidationRule
+
+A `ValidationRule` wraps a `Validator` with additional metadata like path and condition. It's the primary building block of validation logic.
+
+```kotlin
+abstract class ValidationRule {
+    abstract fun validate(context: ValidationContext): ValidationResult
+}
+
+class PathValidationRule(
+    val path: String,
+    val validator: Validator,
+    val condition: ((Any) -> Boolean)? = null
+) : ValidationRule()
+```
+
+### ValidationContext
+
+The `ValidationContext` provides access to the data being validated and manages variables during validation.
+
+```kotlin
+class ValidationContext(val data: Any) {
+    fun getValueByPath(path: String): Any?
+    fun setVariable(name: String, value: Any?)
+    fun getVariable(name: String): Any?
+}
+```
+
+### ValidationResult
+
+A `ValidationResult` represents the outcome of a validation operation, including any errors that occurred.
+
+```kotlin
+data class ValidationResult(
+    val isValid: Boolean,
+    val errors: List<ValidationError> = emptyList()
+)
+```
+
+### ValidationError
+
+A `ValidationError` contains detailed information about a validation failure, including the path, message, and severity.
+
+```kotlin
+data class ValidationError(
+    val path: String,
+    val message: String,
+    val value: Any? = null,
+    val code: String = "",
+    val severity: Severity = Severity.ERROR
+) {
+    enum class Severity {
+        INFO, WARNING, ERROR
+    }
+}
+```
+
+## Key Design Patterns
+
+Understanding these design patterns is crucial for working with the Validation DSL:
+
+### Builder Pattern
+
+The Builder Pattern is used extensively in the DSL to provide a fluent, readable API:
+
+```kotlin
+val validator = ValidationDsl.preValidate {
+    validate("name")
+        .required()
+        .minLength(2)
+        .end()
+}
+```
+
+Key builder classes:
+- `ValidationDslBuilder`
+- `FieldValidationBuilder`
+- `ConditionalValidationBuilder`
+- `ForEachValidationBuilder`
+
+### Command Pattern
+
+Each validation rule acts as a command that can be executed against data:
+
+```kotlin
+// The command
+class MinLengthValidator(private val minLength: Int) : Validator {
+    override fun validate(context: ValidationContext, path: String): ValidationResult {
+        // Implementation
+    }
+}
+
+// Using the command
+validate("name").minLength(5).end()
+```
+
+### Composite Pattern
+
+Validators can be combined using AND/OR logic to create complex validation rules:
+
+```kotlin
+// The composite
+class CompositeValidator(
+    private val left: Validator,
+    private val right: Validator,
+    private val type: CompositeType
+) : Validator
+
+// Using composition
+val validator = NotNullValidator() and MinLengthValidator(5)
+```
+
+### Strategy Pattern
+
+Different validation strategies can be used interchangeably:
+
+```kotlin
+// Strategy interface
+interface Validator {
+    fun validate(context: ValidationContext, path: String): ValidationResult
+}
+
+// Concrete strategies
+class EmailValidator : Validator
+class PatternValidator(private val pattern: Regex) : Validator
+```
+
+### Factory Method Pattern
+
+Factory methods create validators and rules:
+
+```kotlin
+// Factory method
+fun ValidationDslBuilder.validate(path: String): FieldValidationBuilder {
+    return FieldValidationBuilder(this, path)
+}
+```
+
+## Package Structure and Responsibilities
+
+### core Package
+
+Contains fundamental interfaces and abstract classes:
+
+- `Validator`: Base interface for all validators
+- `ValidationRule`: Abstract class for validation rules
+- `ValidationResult`: Represents validation results
+- `ValidationError`: Contains validation error information
+
+### rules Package
+
+Contains concrete validator implementations:
+
+- `NotNullValidator`: Validates that a value is not null
+- `MinLengthValidator`: Validates minimum string length
+- `MaxLengthValidator`: Validates maximum string length
+- `PatternValidator`: Validates against a regex pattern
+- `EmailValidator`: Validates email addresses
+- `DateValidator`: Validates date formats
+- `MinValueValidator`: Validates minimum numeric values
+- `MaxValueValidator`: Validates maximum numeric values
+- `AllowedValuesValidator`: Validates that a value is in a set
+- `PredicateValidator`: Validates using a custom predicate
+- `CompositeValidator`: Combines validators with AND/OR logic
+
+### builders Package
+
+Contains classes that form the DSL:
+
+- `ValidationDslBuilder`: Main entry point for the DSL
+- `FieldValidationBuilder`: Builder for field validation
+- `ConditionalValidationBuilder`: Builder for conditional validation
+- `ForEachValidationBuilder`: Builder for collection validation
+- `BulkValidationBuilder`: Builder for validating multiple fields
+
+### context Package
+
+Contains classes for validation execution:
+
+- `ValidationContext`: Provides access to data and variables
+- `PathAccessor`: Helper for accessing data by path
+
+### config Package
+
+Contains configuration classes:
+
+- `ValidationConfig`: Configuration for validation behavior
+
+### errors Package
+
+Contains error handling and reporting:
+
+- `ValidationException`: Exception thrown on validation failure
+
+### integration Package
+
+Contains integration with the mapping system:
+
+- `ValidatedMapping`: Combines mapping with validation
+- `ValidationMappingRule`: Validation rule for use in mapping
+
+### util Package
+
+Contains utility classes:
+
+- `PathMatcher`: Utility for matching paths in data
+
+## Extending the System
+
+### Adding New Validators
+
+To add a new validator:
+
+1. Create a class that implements the `Validator` interface
+2. Implement the `validate` method
+3. Add an extension method to `FieldValidationBuilder`
+
+Example: Adding a URL validator
+
+```kotlin
+// 1. Create the validator
+class UrlValidator : Validator {
+    private val urlPattern = Regex("^(https?|ftp)://[^\\s/$.?#].[^\\s]*$")
+    
+    override fun validate(context: ValidationContext, path: String): ValidationResult {
+        val value = context.getValueByPath(path)
+        
+        if (value == null) {
+            return ValidationResult.valid()
+        }
+        
+        val strValue = value.toString()
+        return if (urlPattern.matches(strValue)) {
+            ValidationResult.valid()
+        } else {
+            ValidationResult.invalid(
+                ValidationError(
+                    path, 
+                    "Invalid URL format: $strValue", 
+                    value, 
+                    "URL_FORMAT"
+                )
+            )
+        }
+    }
+}
+
+// 2. Add extension method to FieldValidationBuilder
+fun FieldValidationBuilder.url(): FieldValidationBuilder {
+    addValidator(UrlValidator())
+    return this
+}
+
+// 3. Usage
+validate("website").url().end()
+```
+
+### Extending the DSL
+
+To add new DSL capabilities:
+
+1. Create a new builder class
+2. Add extension methods to existing builders
+3. Connect the new builder to the validation system
+
+Example: Adding a "validateIf" feature for conditional validation
+
+```kotlin
+// 1. Create a new builder
+class ConditionalFieldValidationBuilder(
+    private val parent: ValidationDslBuilder,
+    private val condition: (Any) -> Boolean,
+    private val path: String
+) {
+    private var validator: Validator? = null
+    
+    fun required(): ConditionalFieldValidationBuilder {
+        addValidator(NotNullValidator())
+        return this
+    }
+    
+    // Add more validation methods
+    
+    fun end(): ValidationDslBuilder {
+        val finalValidator = validator ?: NotNullValidator()
+        val rule = PathValidationRule(path, finalValidator, condition)
+        parent.addRule(rule)
+        return parent
+    }
+    
+    private fun addValidator(newValidator: Validator) {
+        validator = if (validator != null) {
+            validator!! and newValidator
+        } else {
+            newValidator
+        }
+    }
+}
+
+// 2. Add extension method to ValidationDslBuilder
+fun ValidationDslBuilder.validateIf(
+    condition: (Any) -> Boolean,
+    path: String
+): ConditionalFieldValidationBuilder {
+    return ConditionalFieldValidationBuilder(this, condition, path)
+}
+
+// 3. Usage
+validateIf({ data -> 
+    (data as? Map<*, *>)?.get("type") == "premium"
+}, "subscriptionEndDate")
+    .required()
+    .date("yyyy-MM-dd")
+    .end()
+```
+
+### Creating Custom Validation Rules
+
+For more complex validation logic:
+
+1. Create a new class that extends `ValidationRule`
+2. Implement the `validate` method
+3. Add a method to create and add your rule
+
+Example: Adding a cross-field comparison rule
+
+```kotlin
+// 1. Create the rule
+class ComparisonValidationRule(
+    private val field1: String,
+    private val field2: String,
+    private val operator: ComparisonOperator,
+    private val message: String
+) : ValidationRule() {
+    enum class ComparisonOperator { EQUAL, NOT_EQUAL, GREATER_THAN, LESS_THAN }
+    
+    override fun validate(context: ValidationContext): ValidationResult {
+        val value1 = context.getValueByPath(field1)
+        val value2 = context.getValueByPath(field2)
+        
+        if (value1 == null || value2 == null) {
+            return ValidationResult.valid()
+        }
+        
+        val isValid = when (operator) {
+            ComparisonOperator.EQUAL -> value1 == value2
+            ComparisonOperator.NOT_EQUAL -> value1 != value2
+            ComparisonOperator.GREATER_THAN -> {
+                if (value1 is Number && value2 is Number) {
+                    value1.toDouble() > value2.toDouble()
+                } else {
+                    value1.toString() > value2.toString()
+                }
+            }
+            ComparisonOperator.LESS_THAN -> {
+                if (value1 is Number && value2 is Number) {
+                    value1.toDouble() < value2.toDouble()
+                } else {
+                    value1.toString() < value2.toString()
+                }
+            }
+        }
+        
+        return if (isValid) {
+            ValidationResult.valid()
+        } else {
+            ValidationResult.invalid(
+                ValidationError(
+                    "$field1, $field2",
+                    message,
+                    listOf(value1, value2),
+                    "COMPARISON"
+                )
+            )
+        }
+    }
+}
+
+// 2. Add extension method to ValidationDslBuilder
+fun ValidationDslBuilder.compareFields(
+    field1: String,
+    field2: String,
+    operator: ComparisonValidationRule.ComparisonOperator,
+    message: String
+): ValidationDslBuilder {
+    addRule(ComparisonValidationRule(field1, field2, operator, message))
+    return this
+}
+
+// 3. Usage
+compareFields(
+    "startDate",
+    "endDate",
+    ComparisonValidationRule.ComparisonOperator.LESS_THAN,
+    "Start date must be before end date"
+)
+```
+
+## Key Classes and Implementation Details
+
+### ValidationDslBuilder
+
+The main entry point for creating validation rules:
+
+```kotlin
+class ValidationDslBuilder {
+    private val rules = mutableListOf<ValidationRule>()
+    
+    fun validate(path: String): FieldValidationBuilder {
+        return FieldValidationBuilder(this, path)
+    }
+    
+    fun `when`(condition: (Any) -> Boolean): ConditionalValidationBuilder {
+        return ConditionalValidationBuilder(this, condition)
+    }
+    
+    fun forEach(collectionPath: String): ForEachValidationBuilder {
+        return ForEachValidationBuilder(this, collectionPath)
+    }
+    
+    internal fun addRule(rule: ValidationRule) {
+        rules.add(rule)
+    }
+    
+    fun buildPreValidator(): PreValidator {
+        val validator = PreValidator()
+        rules.forEach { validator.addRule(it) }
+        return validator
+    }
+    
+    // Other builder methods...
+}
+```
+
+### FieldValidationBuilder
+
+Builds validation rules for a specific field:
+
+```kotlin
+class FieldValidationBuilder(
+    private val parent: ValidationDslBuilder,
+    private val path: String
+) {
+    private var validator: Validator? = null
+    private var condition: ((Any) -> Boolean)? = null
+    private var severity: ValidationError.Severity = ValidationError.Severity.ERROR
+    
+    fun required(): FieldValidationBuilder {
+        addValidator(NotNullValidator())
+        return this
+    }
+    
+    // Other validation methods...
+    
+    fun end(): ValidationDslBuilder {
+        val finalValidator = createFinalValidator()
+        val rule = PathValidationRule(path, finalValidator, condition)
+        parent.addRule(rule)
+        return parent
+    }
+    
+    private fun addValidator(newValidator: Validator) {
+        validator = if (validator != null) {
+            validator!! and newValidator
+        } else {
+            newValidator
+        }
+    }
+    
+    private fun createFinalValidator(): Validator {
+        // Logic to wrap the validator with severity handling
+    }
+}
+```
+
+### ValidationContext
+
+Provides access to data and variables during validation:
+
+```kotlin
+class ValidationContext(val data: Any) {
+    private val variables = mutableMapOf<String, Any?>()
+    
+    fun getValueByPath(path: String): Any? {
+        return when {
+            path.startsWith("'") && path.endsWith("'") -> {
+                // Literal value
+                path.substring(1, path.length - 1)
+            }
+            path.startsWith("$") -> {
+                // Variable reference
+                variables[path.substring(1)]
+            }
+            else -> {
+                // Path in data
+                extractValueByPath(data, path)
+            }
+        }
+    }
+    
+    // Other methods...
+    
+    private fun extractValueByPath(source: Any, path: String): Any? {
+        // Implementation details for path-based extraction
+    }
+}
+```
+
+### CompositeValidator
+
+Combines validators using AND/OR logic:
+
+```kotlin
+class CompositeValidator(
+    private val left: Validator,
+    private val right: Validator,
+    private val type: CompositeType
+) : Validator {
+    override fun validate(context: ValidationContext, path: String): ValidationResult {
+        val leftResult = left.validate(context, path)
+        
+        when (type) {
+            CompositeType.AND -> {
+                // Both must be valid
+                val rightResult = right.validate(context, path)
+                return leftResult.merge(rightResult)
+            }
+            ```kotlin
+            CompositeType.OR -> {
+                // If left is valid, we're done
+                if (leftResult.isValid) return ValidationResult.valid()
+                
+                // Otherwise, check right
+                val rightResult = right.validate(context, path)
+                return if (rightResult.isValid) {
+                    ValidationResult.valid()
+                } else {
+                    // Both failed - combine errors
+                    ValidationResult.invalid(leftResult.errors + rightResult.errors)
+                }
+            }
+        }
+    }
+}
+```
+
+### DataValidator (Base Class)
+
+The base class for all validator types:
+
+```kotlin
+abstract class DataValidator {
+    protected val rules = mutableListOf<ValidationRule>()
+    
+    fun validate(data: Any, config: ValidationConfig = ValidationConfig()): ValidationResult {
+        val context = ValidationContext(data)
+        var combined = ValidationResult.valid()
+        
+        for (rule in rules) {
+            val result = rule.validate(context)
+            
+            if (!result.isValid) {
+                if (config.failFast) {
+                    return result
+                }
+                
+                // Filter errors based on severity
+                val filteredErrors = result.errors.filter { error ->
+                    when (error.severity) {
+                        ValidationError.Severity.ERROR -> true
+                        ValidationError.Severity.WARNING -> config.includeWarnings
+                        ValidationError.Severity.INFO -> config.includeInfos
+                    }
+                }
+                
+                if (filteredErrors.isNotEmpty()) {
+                    combined = combined.merge(ValidationResult.invalid(filteredErrors))
+                }
+            }
+        }
+        
+        return combined
+    }
+    
+    fun addRule(rule: ValidationRule) {
+        rules.add(rule)
+    }
+}
+
+// Specific validator types
+class PreValidator : DataValidator()
+class InValidator : DataValidator()
+class PostValidator : DataValidator()
+```
+
+### ForEachValidationRule
+
+Validates each item in a collection:
+
+```kotlin
+class ForEachValidationRule(
+    private val collectionPath: String,
+    private val itemRules: List<ValidationRule>
+) : ValidationRule() {
+    override fun validate(context: ValidationContext): ValidationResult {
+        val collection = context.getValueByPath(collectionPath)
+        if (collection == null) {
+            return ValidationResult.valid()
+        }
+        
+        val items = when (collection) {
+            is DataNode.ArrayNode -> collection.elements
+            is Collection<*> -> collection.toList()
+            is Array<*> -> collection.toList()
+            else -> return ValidationResult.invalid(
+                ValidationError(
+                    collectionPath,
+                    "Expected a collection at $collectionPath, but found ${collection::class.simpleName}",
+                    collection,
+                    "TYPE_MISMATCH"
+                )
+            )
+        }
+        
+        if (items.isEmpty()) {
+            return ValidationResult.valid()
+        }
+        
+        var result = ValidationResult.valid()
+        
+        // Validate each item
+        for (i in items.indices) {
+            val itemContext = ValidationContext(items[i] ?: continue)
+            
+            for (rule in itemRules) {
+                val ruleResult = when (rule) {
+                    is PathValidationRule -> {
+                        // For path rules, we need to adjust the paths in error messages
+                        val itemResult = rule.validate(itemContext)
+                        if (!itemResult.isValid) {
+                            // Update error paths to include the collection path and index
+                            val updatedErrors = itemResult.errors.map { error ->
+                                error.copy(path = "$collectionPath[$i].${error.path}")
+                            }
+                            ValidationResult.invalid(updatedErrors)
+                        } else {
+                            ValidationResult.valid()
+                        }
+                    }
+                    else -> rule.validate(itemContext)
+                }
+                
+                result = result.merge(ruleResult)
+            }
+        }
+        
+        return result
+    }
+}
+```
+
+## Integration with Mapping
+
+The validation system integrates with the mapping system in three ways:
+
+### 1. Pre-Validation
+
+Validates source data before mapping:
+
+```kotlin
+class ValidatedMapping(
+    private val mapping: xyz.mahmoudahmed.dsl.core.Mapping,
+    private val preValidator: PreValidator? = null,
+    private val postValidator: PostValidator? = null,
+    private val validationConfig: ValidationConfig = ValidationConfig()
+) {
+    fun execute(sourceData: Any): Any {
+        // Pre-validation
+        preValidator?.let {
+            val preResult = it.validate(sourceData, validationConfig)
+            if (!preResult.isValid && validationConfig.throwOnError) {
+                throw ValidationException("Pre-validation failed", preResult.errors)
+            }
+        }
+        
+        // Execute mapping
+        val result = mapping.execute(sourceData)
+        
+        // Post-validation
+        postValidator?.let {
+            val postResult = it.validate(result, validationConfig)
+            if (!postResult.isValid && validationConfig.throwOnError) {
+                throw ValidationException("Post-validation failed", postResult.errors)
+            }
+        }
+        
+        return result
+    }
+    
+    // Other methods...
+}
+```
+
+### 2. In-Validation
+
+Validates data during the mapping process:
+
+```kotlin
+class ValidationMappingRule(private val validator: InValidator) : MappingRule {
+    override fun apply(context: MappingContext, target: Any) {
+        val result = validator.validate(context.sourceData)
+        if (!result.isValid) {
+            throw MappingExecutionException(
+                "Validation failed during mapping: ${result.errors.joinToString(", ") { it.message }}"
+            )
+        }
+    }
+}
+```
+
+### 3. Post-Validation
+
+Validates target data after mapping:
+
+```kotlin
+// Implementation already shown in ValidatedMapping above
+```
+
+### Extension Methods for Integration
+
+To provide a fluent API for integration:
+
+```kotlin
+/**
+ * Extension function to add in-validation to a mapping.
+ */
+fun xyz.mahmoudahmed.dsl.builders.TargetBuilder.validateDuring(
+    init: ValidationDslBuilder.() -> Unit
+): xyz.mahmoudahmed.dsl.builders.TargetBuilder {
+    val validator = ValidationDsl.inValidate(init)
+    this.addRule(ValidationMappingRule(validator))
+    return this
+}
+
+/**
+ * Extension function to add pre-validation to a mapping.
+ */
+fun xyz.mahmoudahmed.dsl.builders.TargetBuilder.withPreValidation(
+    init: ValidationDslBuilder.() -> Unit
+): xyz.mahmoudahmed.dsl.builders.TargetBuilder {
+    this.properties["preValidator"] = ValidationDsl.preValidate(init)
+    return this
+}
+
+/**
+ * Extension function to add post-validation to a mapping.
+ */
+fun xyz.mahmoudahmed.dsl.builders.TargetBuilder.withPostValidation(
+    init: ValidationDslBuilder.() -> Unit
+): xyz.mahmoudahmed.dsl.builders.TargetBuilder {
+    this.properties["postValidator"] = ValidationDsl.postValidate(init)
+    return this
+}
+
+/**
+ * Extension function to build a mapping with validation.
+ */
+fun xyz.mahmoudahmed.dsl.builders.TargetBuilder.buildWithValidation(
+    config: ValidationConfig = ValidationConfig()
+): ValidatedMapping {
+    val mapping = this.build()
+    
+    val preValidator = this.properties["preValidator"] as? PreValidator
+    val postValidator = this.properties["postValidator"] as? PostValidator
+    
+    return ValidatedMapping(mapping, preValidator, postValidator, config)
+}
+```
+
+## Testing Strategies
+
+Effectively testing the Validation DSL requires multiple approaches:
+
+### Unit Testing Validators
+
+Test each validator in isolation:
+
+```kotlin
+class EmailValidatorTest {
+    private val validator = EmailValidator()
+    private val context = mockk<ValidationContext>()
+    
+    @Test
+    fun `valid email should pass validation`() {
+        // Setup
+        every { context.getValueByPath(any()) } returns "test@example.com"
+        
+        // Execute
+        val result = validator.validate(context, "email")
+        
+        // Verify
+        assertTrue(result.isValid)
+        assertTrue(result.errors.isEmpty())
+    }
+    
+    @Test
+    fun `invalid email should fail validation`() {
+        // Setup
+        every { context.getValueByPath(any()) } returns "not-an-email"
+        
+        // Execute
+        val result = validator.validate(context, "email")
+        
+        // Verify
+        assertFalse(result.isValid)
+        assertEquals(1, result.errors.size)
+        assertEquals("Invalid email address: not-an-email", result.errors[0].message)
+    }
+}
+```
+
+### Integration Testing of Validation Rules
+
+Test how rules work together:
+
+```kotlin
+class ValidationRuleIntegrationTest {
+    @Test
+    fun `test composite validators with AND logic`() {
+        // Setup
+        val minLengthValidator = MinLengthValidator(5)
+        val patternValidator = PatternValidator(Regex("[a-z]+"))
+        val compositeValidator = minLengthValidator and patternValidator
+        
+        val context = ValidationContext(mapOf("username" to "abc"))
+        
+        // Execute
+        val result = compositeValidator.validate(context, "username")
+        
+        // Verify
+        assertFalse(result.isValid)
+        assertEquals(1, result.errors.size)  // Only the minLength error
+    }
+    
+    @Test
+    fun `test conditional validation`() {
+        // Setup
+        val validator = ValidationDsl.preValidate {
+            validate("age")
+                .min(18)
+                .`when` { data ->
+                    (data as? Map<*, *>)?.get("country") == "US"
+                }
+                .end()
+        }
+        
+        // Execute - should pass because condition is not met
+        val resultNonUS = validator.validate(mapOf(
+            "country" to "UK",
+            "age" to 16
+        ))
+        
+        // Execute - should fail because condition is met and validation fails
+        val resultUS = validator.validate(mapOf(
+            "country" to "US",
+            "age" to 16
+        ))
+        
+        // Verify
+        assertTrue(resultNonUS.isValid)
+        assertFalse(resultUS.isValid)
+    }
+}
+```
+
+### End-to-End Testing with Mapping
+
+Test validation in the context of a mapping operation:
+
+```kotlin
+class ValidatedMappingTest {
+    @Test
+    fun `test complete validation and mapping flow`() {
+        // Setup
+        val mapping = Platymap.flow("user")
+            .to("profile")
+            .withPreValidation {
+                validate("user.email").required().email().end()
+            }
+            .map("user.email").to("email")
+            .withPostValidation {
+                validate("email").required().end()
+            }
+            .buildWithValidation()
+        
+        // Valid data
+        val validData = """{"user": {"email": "test@example.com"}}"""
+        
+        // Invalid data
+        val invalidData = """{"user": {"email": "invalid"}}"""
+        
+        // Execute and verify
+        val result = mapping.executeToJson(validData)
+        assertTrue(result.contains("test@example.com"))
+        
+        assertThrows<ValidationException> {
+            mapping.executeToJson(invalidData)
+        }
+    }
+}
+```
+
+### Performance Testing
+
+For large datasets, performance testing is crucial:
+
+```kotlin
+class ValidationPerformanceTest {
+    @Test
+    fun `measure validation performance`() {
+        // Setup - create a complex validator
+        val validator = ValidationDsl.preValidate {
+            // Add many validation rules
+        }
+        
+        // Create large test dataset
+        val largeData = generateLargeTestData()
+        
+        // Measure execution time
+        val startTime = System.currentTimeMillis()
+        validator.validate(largeData)
+        val endTime = System.currentTimeMillis()
+        
+        // Assert that validation completes within acceptable time
+        val executionTime = endTime - startTime
+        assertTrue(executionTime < 1000, "Validation took too long: $executionTime ms")
+    }
+    
+    private fun generateLargeTestData(): Map<String, Any> {
+        // Create a large nested data structure
+        return mapOf(
+            "items" to List(1000) { index ->
+                mapOf(
+                    "id" to "item-$index",
+                    "value" to index,
+                    "data" to mapOf(
+                        "field1" to "value1",
+                        "field2" to "value2",
+                        // More fields...
+                    )
+                )
+            }
+        )
+    }
+}
+```
+
+## Common Challenges and Solutions
+
+### Challenge 1: Complex DSL Syntax
+
+**Problem**: The DSL can become complex, making it hard to understand and debug.
+
+**Solution**: Use clear documentation, consistent naming, and break complex validations into smaller, reusable components:
+
+```kotlin
+// Hard to understand
+validate("user.contact.address.zipCode")
+    .required()
+    .pattern(Regex("^\\d{5}(-\\d{4})?$"))
+    .`when` { data -> 
+        (data as? Map<*, *>)?.get("user")?.let { 
+            (it as? Map<*, *>)?.get("country") == "US" 
+        } ?: false 
+    }
+    .end()
+
+// Better: Extract reusable components
+fun ValidationDslBuilder.validateUSZipCode(path: String): ValidationDslBuilder {
+    validate(path)
+        .required()
+        .pattern(Regex("^\\d{5}(-\\d{4})?$"))
+        .end()
+    return this
+}
+
+fun isUSCountry(data: Any): Boolean {
+    return (data as? Map<*, *>)?.get("user")?.let { 
+        (it as? Map<*, *>)?.get("country") == "US" 
+    } ?: false
+}
+
+// Usage
+`when`(::isUSCountry) {
+    validateUSZipCode("user.contact.address.zipCode")
+}
+```
+
+### Challenge 2: Type Safety
+
+**Problem**: Working with dynamic data can lead to type casting issues.
+
+**Solution**: Use safe casts and provide meaningful error messages:
+
+```kotlin
+// Unsafe
+val total = (subtotal as Double) + (tax as Double)
+
+// Safer
+val subtotal = (values[0] as? Number)?.toDouble() ?: 0.0
+val tax = (values[1] as? Number)?.toDouble() ?: 0.0
+val total = subtotal + tax
+```
+
+### Challenge 3: Path Resolution
+
+**Problem**: Complex path expressions can be hard to resolve correctly.
+
+**Solution**: Implement robust path resolution with clear error handling:
+
+```kotlin
+fun extractValueByPath(source: Any, path: String): Any? {
+    try {
+        // Implementation
+    } catch (e: Exception) {
+        logger.debug("Error resolving path '$path': ${e.message}")
+        return null
+    }
+}
+```
+
+### Challenge 4: Recursive Validation
+
+**Problem**: Validating deeply nested structures can be challenging.
+
+**Solution**: Use recursion carefully and limit depth to avoid stack overflow:
+
+```kotlin
+fun validateNestedObject(
+    context: ValidationContext, 
+    path: String, 
+    depth: Int = 0,
+    maxDepth: Int = 10
+): ValidationResult {
+    if (depth >= maxDepth) {
+        return ValidationResult.invalid(
+            ValidationError(path, "Max nesting depth exceeded", null, "MAX_DEPTH")
+        )
+    }
+    
+    // Continue with recursive validation
+}
+```
+
+### Challenge 5: Custom Error Messages
+
+**Problem**: Generic error messages aren't helpful to users.
+
+**Solution**: Provide detailed, customizable error messages:
+
+```kotlin
+fun FieldValidationBuilder.minLength(
+    length: Int,
+    message: String? = null
+): FieldValidationBuilder {
+    val customMessage = message ?: "String length must be at least $length"
+    addValidator(MinLengthValidator(length, customMessage))
+    return this
+}
+
+class MinLengthValidator(
+    private val minLength: Int,
+    private val customMessage: String? = null
+) : Validator {
+    override fun validate(context: ValidationContext, path: String): ValidationResult {
+        // When validation fails:
+        val message = customMessage ?: "String length must be at least $minLength, but was ${strValue.length}"
+        return ValidationResult.invalid(ValidationError(path, message, value, "MIN_LENGTH"))
+    }
+}
+```
+
+## Advanced Techniques
+
+### 1. Domain-Specific Validators
+
+Create validators tailored to specific domains:
+
+```kotlin
+// Finance domain
+class CurrencyValidator(private val allowedCurrencies: Set<String>) : Validator {
+    override fun validate(context: ValidationContext, path: String): ValidationResult {
+        val value = context.getValueByPath(path)?.toString() ?: return ValidationResult.valid()
+        
+        return if (allowedCurrencies.contains(value.toUpperCase())) {
+            ValidationResult.valid()
+        } else {
+            ValidationResult.invalid(
+                ValidationError(
+                    path,
+                    "Currency must be one of: ${allowedCurrencies.joinToString(", ")}",
+                    value,
+                    "INVALID_CURRENCY"
+                )
+            )
+        }
+    }
+}
+
+// Extension method
+fun FieldValidationBuilder.currency(vararg allowed: String): FieldValidationBuilder {
+    addValidator(CurrencyValidator(allowed.toSet()))
+    return this
+}
+
+// Usage
+validate("payment.currency").currency("USD", "EUR", "GBP").end()
+```
+
+### 2. Validation Profiles
+
+Create profiles for different validation scenarios:
+
+```kotlin
+object ValidationProfiles {
+    fun createUserProfile(strictMode: Boolean = false): ValidationDslBuilder.() -> Unit = {
+        validate("username").required().minLength(3).end()
+        validate("email").required().email().end()
+        
+        if (strictMode) {
+            validate("password")
+                .required()
+                .minLength(8)
+                .custom({ password ->
+                    ```kotlin
+                    // Complex password validation
+                    val passwordStr = password.toString()
+                    passwordStr.any { it.isUpperCase() } &&
+                    passwordStr.any { it.isLowerCase() } &&
+                    passwordStr.any { it.isDigit() } &&
+                    passwordStr.any { !it.isLetterOrDigit() }
+                }, "Password must include uppercase, lowercase, digit, and special character")
+                .end()
+        }
+    }
+    
+    fun createOrderProfile(includeShipping: Boolean = true): ValidationDslBuilder.() -> Unit = {
+        validate("orderId").required().pattern(Regex("^ORD-\\d+$")).end()
+        validate("items").required().size(min = 1).end()
+        
+        forEach("items") {
+            validate("productId").required().end()
+            validate("quantity").required().min(1).end()
+            validate("price").required().min(0.01).end()
+        }
+        
+        if (includeShipping) {
+            validate("shipping.address").required().end()
+            validate("shipping.method").required().allowedValues("standard", "express").end()
+        }
+    }
+}
+
+// Usage
+val userValidator = ValidationDsl.preValidate(ValidationProfiles.createUserProfile(strictMode = true))
+val orderValidator = ValidationDsl.preValidate(ValidationProfiles.createOrderProfile(includeShipping = false))
+
+// Combine profiles
+val completeValidator = ValidationDsl.preValidate {
+    apply(ValidationProfiles.createUserProfile())
+    apply(ValidationProfiles.createOrderProfile())
+    
+    // Add additional validations
+    validate("paymentMethod").required().end()
+}
+
+// Helper extension function to apply a profile
+fun ValidationDslBuilder.apply(profile: ValidationDslBuilder.() -> Unit) {
+    this.profile()
+}
+```
+
+### 3. Recursive Structure Validation
+
+Validate complex recursive structures like trees:
+
+```kotlin
+class RecursiveValidator(
+    private val childrenPath: String,
+    private val validators: List<Validator>,
+    private val maxDepth: Int = 10
+) : Validator {
+    override fun validate(context: ValidationContext, path: String): ValidationResult {
+        return validateRecursively(context, path, 0)
+    }
+    
+    private fun validateRecursively(
+        context: ValidationContext, 
+        path: String, 
+        depth: Int
+    ): ValidationResult {
+        if (depth >= maxDepth) {
+            return ValidationResult.invalid(
+                ValidationError(path, "Maximum recursion depth exceeded", null, "MAX_DEPTH")
+            )
+        }
+        
+        // Validate the current node
+        var result = ValidationResult.valid()
+        for (validator in validators) {
+            result = result.merge(validator.validate(context, path))
+        }
+        
+        // Get children and validate each one recursively
+        val children = context.getValueByPath("$path.$childrenPath")
+        if (children is Collection<*>) {
+            for (i in children.indices) {
+                val childPath = "$path.$childrenPath[$i]"
+                val childContext = ValidationContext(children.elementAt(i) ?: continue)
+                val childResult = validateRecursively(childContext, childPath, depth + 1)
+                result = result.merge(childResult)
+            }
+        }
+        
+        return result
+    }
+}
+
+// Extension method
+fun ValidationDslBuilder.validateTree(
+    path: String,
+    childrenPath: String,
+    maxDepth: Int = 10,
+    init: FieldValidationBuilder.() -> FieldValidationBuilder
+): ValidationDslBuilder {
+    val builder = FieldValidationBuilder(this, path)
+    val configuredBuilder = builder.init()
+    
+    // Extract validators from the builder
+    val validator = configuredBuilder.buildValidator()
+    
+    // Create and add the recursive validator
+    addRule(PathValidationRule(
+        path, 
+        RecursiveValidator(childrenPath, listOf(validator), maxDepth)
+    ))
+    
+    return this
+}
+
+// Usage
+validateTree("categories", "subcategories", maxDepth = 5) {
+    required()
+    custom({ category ->
+        (category as? Map<*, *>)?.containsKey("name") == true
+    }, "Category must have a name")
+}
+```
+
+### 4. Asynchronous Validation
+
+For validations that require external service calls:
+
+```kotlin
+class AsyncValidator(
+    private val asyncCheck: suspend (Any?) -> Boolean,
+    private val message: String,
+    private val code: String = "ASYNC"
+) : Validator {
+    override fun validate(context: ValidationContext, path: String): ValidationResult {
+        val value = context.getValueByPath(path)
+        
+        // For synchronous validation, we need to run the async check in a blocking manner
+        // In a real implementation, you might want to collect all async validations and run them in parallel
+        val isValid = runBlocking {
+            asyncCheck(value)
+        }
+        
+        return if (isValid) {
+            ValidationResult.valid()
+        } else {
+            ValidationResult.invalid(
+                ValidationError(path, message, value, code)
+            )
+        }
+    }
+}
+
+// Extension method
+fun FieldValidationBuilder.asyncCheck(
+    check: suspend (Any?) -> Boolean,
+    message: String,
+    code: String = "ASYNC"
+): FieldValidationBuilder {
+    addValidator(AsyncValidator(check, message, code))
+    return this
+}
+
+// Usage
+validate("email")
+    .required()
+    .email()
+    .asyncCheck(
+        check = { email ->
+            // Call an external service to verify the email
+            emailVerificationService.isEmailValid(email.toString())
+        },
+        message = "Email could not be verified"
+    )
+    .end()
+```
+
+### 5. Context-Aware Validation
+
+Create validators that use context information:
+
+```kotlin
+class ContextAwareValidator(
+    private val contextVariableName: String,
+    private val predicate: (Any?, Any?) -> Boolean,
+    private val message: String,
+    private val code: String = "CONTEXT"
+) : Validator {
+    override fun validate(context: ValidationContext, path: String): ValidationResult {
+        val value = context.getValueByPath(path)
+        val contextValue = context.getVariable(contextVariableName)
+        
+        return if (predicate(value, contextValue)) {
+            ValidationResult.valid()
+        } else {
+            ValidationResult.invalid(
+                ValidationError(path, message, value, code)
+            )
+        }
+    }
+}
+
+// Extension method
+fun FieldValidationBuilder.withContext(
+    contextVariable: String,
+    predicate: (fieldValue: Any?, contextValue: Any?) -> Boolean,
+    message: String
+): FieldValidationBuilder {
+    addValidator(ContextAwareValidator(contextVariable, predicate, message))
+    return this
+}
+
+// Usage with context
+val validator = ValidationDsl.preValidate {
+    // Set up context variables
+    setVariable("maxOrderAmount", 1000)
+    
+    validate("order.total")
+        .required()
+        .withContext(
+            contextVariable = "maxOrderAmount",
+            predicate = { total, maxAmount ->
+                (total as? Number)?.toDouble() ?: 0.0 <= (maxAmount as? Number)?.toDouble() ?: Double.MAX_VALUE
+            },
+            message = "Order total exceeds maximum allowed amount"
+        )
+        .end()
+}
+```
+
+## Learning Resources
+
+To become proficient in developing and extending the Validation DSL, focus on these key areas:
+
+### 1. Kotlin Language Features
+
+**Resources:**
+- [Kotlin Official Documentation](https://kotlinlang.org/docs/home.html)
+- [Kotlin By Example](https://play.kotlinlang.org/byExample/overview)
+- Book: "Kotlin in Action" by Dmitry Jemerov and Svetlana Isakova
+
+**Key concepts to learn:**
+- Lambda expressions and higher-order functions
+- Extension functions and properties
+- Nullable types and safe operators
+- Property delegates
+- Operator overloading
+- Coroutines (for advanced use cases)
+
+### 2. Domain-Specific Languages (DSLs)
+
+**Resources:**
+- [Kotlin DSL Guide](https://kotlinlang.org/docs/type-safe-builders.html)
+- [Building DSLs in Kotlin](https://proandroiddev.com/writing-dsls-in-kotlin-part-1-7f5d2193f277)
+- Book: "Mastering Kotlin" by Nate Ebel (Chapter on DSLs)
+
+**Key concepts to learn:**
+- Type-safe builders
+- Lambda with receiver
+- Context receivers (Kotlin 1.6+)
+- Operator functions for DSL syntax
+- Control flow in DSLs
+
+### 3. Design Patterns
+
+**Resources:**
+- Book: "Design Patterns: Elements of Reusable Object-Oriented Software" by Gamma et al.
+- Book: "Head First Design Patterns" by Freeman et al.
+- [Refactoring Guru - Design Patterns](https://refactoring.guru/design-patterns)
+
+**Key patterns to learn:**
+- Builder Pattern
+- Command Pattern
+- Strategy Pattern
+- Composite Pattern
+- Chain of Responsibility
+- Factory Method
+- Visitor Pattern
+
+### 4. Data Validation Concepts
+
+**Resources:**
+- [Jakarta Bean Validation Specification](https://beanvalidation.org/2.0/spec/)
+- [Validation in Spring](https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#validation)
+- Book: "Clean Code" by Robert C. Martin (Chapters on error handling)
+
+**Key concepts to learn:**
+- Validation strategies
+- Error reporting and handling
+- Input sanitization
+- Constraint validation
+- Cross-field validation
+
+### 5. Functional Programming
+
+**Resources:**
+- Book: "Functional Programming in Kotlin" by Marco Vermeulen et al.
+- [Arrow - Functional companion for Kotlin](https://arrow-kt.io/)
+- [Functional Programming Principles in Scala](https://www.coursera.org/learn/progfun1) (Many concepts apply to Kotlin as well)
+
+**Key concepts to learn:**
+- Pure functions
+- Immutability
+- Function composition
+- Monads and functors
+- Error handling with Either/Result types
+
+### 6. Testing
+
+**Resources:**
+- [JUnit 5 User Guide](https://junit.org/junit5/docs/current/user-guide/)
+- [Mockk Documentation](https://mockk.io/)
+- [Kotest Framework](https://kotest.io/)
+- Book: "Effective Unit Testing" by Lasse Koskela
+
+**Key concepts to learn:**
+- Unit testing with JUnit/Kotest
+- Mocking with Mockk
+- Property-based testing
+- BDD-style testing
+- Integration testing
+
+### 7. Software Architecture
+
+**Resources:**
+- Book: "Clean Architecture" by Robert C. Martin
+- Book: "Software Architecture in Practice" by Bass et al.
+- [SOLID Principles](https://blog.cleancoder.com/uncle-bob/2020/10/18/Solid-Relevance.html)
+
+**Key concepts to learn:**
+- Separation of concerns
+- Dependency injection
+- Interface segregation
+- Single responsibility principle
+- Open/closed principle
+
+## Conclusion
+
+The Validation DSL is a powerful system for ensuring data integrity through the mapping process. By understanding its architecture, design patterns, and implementation details, you can effectively extend, maintain, and debug the system.
+
+Remember these key principles:
+
+1. **Keep it simple**: Break complex validation logic into smaller, reusable components
+2. **Stay consistent**: Follow the established patterns and naming conventions
+3. **Test thoroughly**: Unit test individual validators and integration test combinations
+4. **Document clearly**: Add comments and KDoc to explain complex logic
+5. **Handle errors gracefully**: Provide meaningful error messages and context
+
+With these principles in mind, you'll be well-equipped to work with the Validation DSL and contribute effectively to its development.

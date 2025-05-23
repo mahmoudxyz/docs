@@ -36,7 +36,8 @@
             "group": "Contribute",
             "pages": [
               "contribute/step-by-step",
-              "contribute/extend"
+              "contribute/extend",
+              "contribute/validation"
             ]
           }
         ]
