@@ -1,8 +1,7 @@
 ---
-title: 'Validation Implementation Guide '
-description: 'This comprehensive guide is designed for developers who need to understand, maintain, extend, or debug the Validation DSL. Whether you're a junior developer learning the system or a senior developer extending it, this guide will help you understand the architecture, design patterns, and implementation details.'
+description: "This comprehensive guide is designed for developers who need to understand, maintain, extend, or debug the Validation DSL. Whether you're a junior developer learning the system or a senior developer extending it, this guide will help you understand the architecture, design patterns, and implementation details."
+title: "Validation Implementation Guide"
 ---
-
 
 ## Architecture Overview
 
@@ -114,6 +113,7 @@ val validator = ValidationDsl.preValidate {
 ```
 
 Key builder classes:
+
 - `ValidationDslBuilder`
 - `FieldValidationBuilder`
 - `ConditionalValidationBuilder`
@@ -551,7 +551,7 @@ class ValidationContext(val data: Any) {
 
 Combines validators using AND/OR logic:
 
-```kotlin
+````kotlin
 class CompositeValidator(
     private val left: Validator,
     private val right: Validator,
@@ -583,7 +583,7 @@ class CompositeValidator(
         }
     }
 }
-```
+````
 
 ### DataValidator (Base Class)
 
@@ -1162,7 +1162,7 @@ validate("payment.currency").currency("USD", "EUR", "GBP").end()
 
 Create profiles for different validation scenarios:
 
-```kotlin
+````kotlin
 object ValidationProfiles {
     fun createUserProfile(strictMode: Boolean = false): ValidationDslBuilder.() -> Unit = {
         validate("username").required().minLength(3).end()
@@ -1219,7 +1219,7 @@ val completeValidator = ValidationDsl.preValidate {
 fun ValidationDslBuilder.apply(profile: ValidationDslBuilder.() -> Unit) {
     this.profile()
 }
-```
+````
 
 ### 3. Recursive Structure Validation
 
@@ -1411,11 +1411,13 @@ To become proficient in developing and extending the Validation DSL, focus on th
 ### 1. Kotlin Language Features
 
 **Resources:**
+
 - [Kotlin Official Documentation](https://kotlinlang.org/docs/home.html)
 - [Kotlin By Example](https://play.kotlinlang.org/byExample/overview)
 - Book: "Kotlin in Action" by Dmitry Jemerov and Svetlana Isakova
 
 **Key concepts to learn:**
+
 - Lambda expressions and higher-order functions
 - Extension functions and properties
 - Nullable types and safe operators
@@ -1426,25 +1428,29 @@ To become proficient in developing and extending the Validation DSL, focus on th
 ### 2. Domain-Specific Languages (DSLs)
 
 **Resources:**
+
 - [Kotlin DSL Guide](https://kotlinlang.org/docs/type-safe-builders.html)
 - [Building DSLs in Kotlin](https://proandroiddev.com/writing-dsls-in-kotlin-part-1-7f5d2193f277)
 - Book: "Mastering Kotlin" by Nate Ebel (Chapter on DSLs)
 
 **Key concepts to learn:**
+
 - Type-safe builders
 - Lambda with receiver
-- Context receivers (Kotlin 1.6+)
+- Context receivers (Kotlin 1.6\+)
 - Operator functions for DSL syntax
 - Control flow in DSLs
 
 ### 3. Design Patterns
 
 **Resources:**
+
 - Book: "Design Patterns: Elements of Reusable Object-Oriented Software" by Gamma et al.
 - Book: "Head First Design Patterns" by Freeman et al.
 - [Refactoring Guru - Design Patterns](https://refactoring.guru/design-patterns)
 
 **Key patterns to learn:**
+
 - Builder Pattern
 - Command Pattern
 - Strategy Pattern
@@ -1456,11 +1462,13 @@ To become proficient in developing and extending the Validation DSL, focus on th
 ### 4. Data Validation Concepts
 
 **Resources:**
+
 - [Jakarta Bean Validation Specification](https://beanvalidation.org/2.0/spec/)
 - [Validation in Spring](https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#validation)
 - Book: "Clean Code" by Robert C. Martin (Chapters on error handling)
 
 **Key concepts to learn:**
+
 - Validation strategies
 - Error reporting and handling
 - Input sanitization
@@ -1470,11 +1478,13 @@ To become proficient in developing and extending the Validation DSL, focus on th
 ### 5. Functional Programming
 
 **Resources:**
+
 - Book: "Functional Programming in Kotlin" by Marco Vermeulen et al.
 - [Arrow - Functional companion for Kotlin](https://arrow-kt.io/)
 - [Functional Programming Principles in Scala](https://www.coursera.org/learn/progfun1) (Many concepts apply to Kotlin as well)
 
 **Key concepts to learn:**
+
 - Pure functions
 - Immutability
 - Function composition
@@ -1484,12 +1494,14 @@ To become proficient in developing and extending the Validation DSL, focus on th
 ### 6. Testing
 
 **Resources:**
+
 - [JUnit 5 User Guide](https://junit.org/junit5/docs/current/user-guide/)
 - [Mockk Documentation](https://mockk.io/)
 - [Kotest Framework](https://kotest.io/)
 - Book: "Effective Unit Testing" by Lasse Koskela
 
 **Key concepts to learn:**
+
 - Unit testing with JUnit/Kotest
 - Mocking with Mockk
 - Property-based testing
@@ -1499,11 +1511,13 @@ To become proficient in developing and extending the Validation DSL, focus on th
 ### 7. Software Architecture
 
 **Resources:**
+
 - Book: "Clean Architecture" by Robert C. Martin
 - Book: "Software Architecture in Practice" by Bass et al.
 - [SOLID Principles](https://blog.cleancoder.com/uncle-bob/2020/10/18/Solid-Relevance.html)
 
 **Key concepts to learn:**
+
 - Separation of concerns
 - Dependency injection
 - Interface segregation
