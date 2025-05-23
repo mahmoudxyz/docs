@@ -1,0 +1,142 @@
+---
+title: "Extending the Library"
+description: "The PlatyMap library is designed to be extended in various ways. Here's how to add new functionality"
+icon: "cuboid"
+---
+
+### Creating a Custom Mapping Rule
+
+To create a custom mapping rule, implement the `MappingRule` interface:
+
+```kotlin
+class MyCustomRule(
+    private val sourcePath: String,
+    private val targetPath: String,
+    private val multiplier: Int
+) : MappingRule {
+    override fun apply(context: MappingContext, target: Any) {
+        // Get the source value
+        val sourceValue = context.getValueByPath(sourcePath)
+        
+        // Apply your custom logic
+        val targetValue = when (sourceValue) {
+            is Number -> sourceValue.toInt() * multiplier
+            else -> sourceValue
+        }
+        
+        // Set the target value
+        if (target is DataNode.ObjectNode && targetValue != null) {
+            SimpleMapping.setValueInDataNode(target, targetPath, targetValue)
+        }
+    }
+}
+```
+
+### Extending the DSL with a Custom Builder
+
+To add a new feature to the DSL, create a builder class and extend the `TargetBuilder`:
+
+```kotlin
+// First, add a method to TargetBuilder
+class TargetBuilder(/*...*/) {
+    // Existing methods...
+    
+    // New method for your custom feature
+    fun myCustomFeature(sourcePath: String, multiplier: Int): TargetBuilder {
+        addRule(MyCustomRule(sourcePath, sourcePath, multiplier))
+        return this
+    }
+}
+
+// Now you can use it in mappings
+val mapping = Platymap.flow("source")
+    .to("target")
+    .myCustomFeature("value", 2)
+    .build()
+```
+
+For more complex features, create a dedicated builder class:
+
+```kotlin
+class MyCustomFeatureBuilder(
+    private val parent: TargetBuilder,
+    private val sourcePath: String
+) {
+    private var multiplier: Int = 1
+    
+    fun withMultiplier(multiplier: Int): MyCustomFeatureBuilder {
+        this.multiplier = multiplier
+        return this
+    }
+    
+    fun to(targetPath: String): TargetBuilder {
+        parent.addRule(MyCustomRule(sourcePath, targetPath, multiplier))
+        return parent
+    }
+}
+
+// Then add a method to TargetBuilder
+class TargetBuilder(/*...*/) {
+    // Existing methods...
+    
+    fun myCustomFeature(sourcePath: String): MyCustomFeatureBuilder {
+        return MyCustomFeatureBuilder(this, sourcePath)
+    }
+}
+
+// Now you can use the fluent API
+val mapping = Platymap.flow("source")
+    .to("target")
+    .myCustomFeature("value")
+        .withMultiplier(2)
+        .to("doubledValue")
+    .build()
+```
+
+### Adding Custom Functions
+
+To add reusable transformation functions:
+
+```kotlin
+// Register a function directly
+FunctionRegistry.register(
+    MapFunction("capitalize", listOf("text")) { args ->
+        val text = args[0]?.toString() ?: ""
+        text.split(" ").joinToString(" ") { word ->
+            word.capitalize()
+        }
+    }
+)
+
+// Or use the builder pattern
+Platymap.function("capitalize")
+    .with("text")
+    .body { args ->
+        val text = args[0]?.toString() ?: ""
+        text.split(" ").joinToString(" ") { word ->
+            word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        }
+    }
+    .build()
+```
+
+**Note**: In Kotlin, the `capitalize()` method is deprecated. Instead, use `replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }`.
+
+### Creating Custom Path Matchers
+
+For advanced path matching, you can extend the `PathMatcher` class:
+
+```kotlin
+object CustomPathMatcher {
+    fun findCustomMatches(source: DataNode, pattern: String): List<PathMatcher.PathMatch> {
+        // Implement your custom matching logic
+        val matches = mutableListOf<PathMatcher.PathMatch>()
+        
+        // Add matches to the list
+        
+        return matches
+    }
+}
+```
+
+---
