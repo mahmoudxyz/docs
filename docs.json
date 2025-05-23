@@ -26,7 +26,6 @@
             "pages": [
               "essentials/kotlin-basics",
               "essentials/architecture",
-              "essentials/extend",
               "essentials/debug",
               "essentials/examples",
               "essentials/more-kotlin"
@@ -35,7 +34,8 @@
           {
             "group": "Contribute",
             "pages": [
-              "contribute/step-by-step"
+              "contribute/step-by-step",
+              "contribute/extend"
             ]
           }
         ]
