@@ -562,6 +562,7 @@ val orderProcessing = Platymap.flow("order")
     // Additional validation during mapping
     .validateDuring {
         forEach("order.items") {
+            ```kotlin
             validateGroup(
                 "$item.price", 
                 "$item.quantity", 
@@ -570,4 +571,353 @@ val orderProcessing = Platymap.flow("order")
             ) { values ->
                 val price = (values[0] as? Number)?.toDouble() ?: 0.0
                 val quantity = (values[1] as? Number)?.toInt() ?: 0
-                val totalPrice
+                val totalPrice = (values[2] as? Number)?.toDouble() ?: 0.0
+                
+                Math.abs((price * quantity) - totalPrice) < 0.01
+            }
+        }
+    }
+    
+    // Map totals
+    .map("order.subtotal").to("totals.subtotal")
+    .map("order.tax").to("totals.tax")
+    .map("order.total").to("totals.total")
+    
+    // Add shipping information with conditional logic
+    .branch()
+        .when { data ->
+            val shippingMethod = (data as? Map<*, *>)?.get("order")?.let {
+                (it as? Map<*, *>)?.get("shipping")?.let { shipping ->
+                    (shipping as? Map<*, *>)?.get("method")?.toString()
+                }
+            }
+            shippingMethod == "express" || shippingMethod == "overnight"
+        }
+        .then()
+            .map("order.shipping.trackingNumber").to("shipping.trackingCode")
+            .map("shippingPriority").transform { "HIGH" }.to("shipping.priority")
+        .endBranch()
+        .otherwise()
+            .map("order.shipping.trackingNumber").to("shipping.trackingCode")
+            .map("shippingPriority").transform { "NORMAL" }.to("shipping.priority")
+        .endBranch()
+    .end()
+    
+    // Post-validate the processed order
+    .withPostValidation {
+        // Ensure required fields exist in output
+        validate("orderId").required().end()
+        validate("orderDate").required().end()
+        validate("customerId").required().end()
+        
+        // Validate items were mapped correctly
+        validate("items").required().size(min = 1).end()
+        
+        forEach("items") {
+            validate("id").required().end()
+            validate("unitPrice").required().min(0).end()
+            validate("quantity").required().min(1).end()
+            validate("totalPrice").required().min(0).end()
+            
+            // Verify calculations are correct
+            validateGroup(
+                "unitPrice", 
+                "quantity", 
+                "totalPrice",
+                message = "Item total price calculation is incorrect"
+            ) { values ->
+                val unitPrice = (values[0] as? Number)?.toDouble() ?: 0.0
+                val quantity = (values[1] as? Number)?.toInt() ?: 0
+                val totalPrice = (values[2] as? Number)?.toDouble() ?: 0.0
+                
+                Math.abs((unitPrice * quantity) - totalPrice) < 0.01
+            }
+        }
+        
+        // Validate totals
+        validate("totals.subtotal").required().min(0).end()
+        validate("totals.tax").required().min(0).end()
+        validate("totals.total").required().min(0).end()
+        
+        // Verify total calculation
+        validateGroup(
+            "totals.subtotal", 
+            "totals.tax", 
+            "totals.total",
+            message = "Order total calculation is incorrect"
+        ) { values ->
+            val subtotal = (values[0] as? Number)?.toDouble() ?: 0.0
+            val tax = (values[1] as? Number)?.toDouble() ?: 0.0
+            val total = (values[2] as? Number)?.toDouble() ?: 0.0
+            
+            Math.abs((subtotal + tax) - total) < 0.01
+        }
+    }
+    
+    // Build with validation
+    .buildWithValidation(
+        ValidationConfig(
+            failFast = false,
+            throwOnError = true,
+            includeWarnings = true
+        )
+    )
+
+// Sample order data
+val orderJson = """
+{
+    "order": {
+        "id": "ORD-12345",
+        "date": "2023-09-15T10:30:00Z",
+        "customer": {
+            "id": "CUST-789",
+            "name": "Jane Smith",
+            "email": "jane@example.com"
+        },
+        "items": [
+            {
+                "productId": "PROD-001",
+                "name": "Smartphone",
+                "price": 699.99,
+                "quantity": 1,
+                "totalPrice": 699.99
+            },
+            {
+                "productId": "PROD-002",
+                "name": "Phone Case",
+                "price": 24.99,
+                "quantity": 2,
+                "totalPrice": 49.98
+            }
+        ],
+        "shipping": {
+            "method": "express",
+            "trackingNumber": "TRK987654321",
+            "estimatedDelivery": "2023-09-18"
+        },
+        "subtotal": 749.97,
+        "tax": 60.00,
+        "total": 809.97
+    }
+}
+"""
+
+// Execute the validated mapping
+try {
+    val result = orderProcessing.executeToJson(orderJson)
+    println("Order processing successful!")
+    println(result)
+} catch (e: ValidationException) {
+    println("Order validation failed:")
+    e.errors.forEach { error ->
+        println("- ${error.path}: ${error.message} (${error.severity})")
+    }
+}
+```
+
+## Common Validation Scenarios
+
+Here are examples of common validation scenarios and how to handle them:
+
+### 1. Form Data Validation
+
+```kotlin
+val formValidator = ValidationDsl.preValidate {
+    // Text fields
+    validate("formData.name")
+        .required()
+        .minLength(2)
+        .maxLength(100)
+        .end()
+        
+    validate("formData.email")
+        .required()
+        .email()
+        .end()
+        
+    // Phone with optional format
+    validate("formData.phone")
+        .pattern(Regex("^\\+?[0-9\\s-()]{10,20}$"))
+        .asWarning()  // Only warn for invalid format
+        .end()
+        
+    // Selection field
+    validate("formData.category")
+        .required()
+        .allowedValues("personal", "business", "education", "other")
+        .end()
+        
+    // Number field
+    validate("formData.age")
+        .min(18)
+        .max(120)
+        .end()
+        
+    // Checkbox confirmation
+    validate("formData.termsAccepted")
+        .custom(
+            predicate = { it == true },
+            message = "You must accept the terms and conditions"
+        )
+        .end()
+        
+    // Date field
+    validate("formData.eventDate")
+        .date("yyyy-MM-dd")
+        .custom(
+            predicate = { date ->
+                // Must be a future date
+                if (date == null) return@custom true
+                val parsedDate = java.time.LocalDate.parse(
+                    date.toString(),
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                )
+                parsedDate.isAfter(java.time.LocalDate.now())
+            },
+            message = "Event date must be in the future"
+        )
+        .end()
+}
+```
+
+### 2. API Response Validation
+
+```kotlin
+val apiResponseValidator = ValidationDsl.postValidate {
+    // Check API status
+    validate("status")
+        .required()
+        .allowedValues("success", "error", "pending")
+        .end()
+        
+    // Conditional validation based on status
+    `when`(condition = { data ->
+        (data as? Map<*, *>)?.get("status") == "success"
+    }) {
+        validate("data")
+            .required()
+            .end()
+            
+        // Check pagination if present
+        `when`(condition = { data ->
+            (data as? Map<*, *>)?.get("data")?.let {
+                (it as? Map<*, *>)?.containsKey("pagination")
+            } == true
+        }) {
+            validate("data.pagination.total")
+                .required()
+                .min(0)
+                .end()
+                
+            validate("data.pagination.page")
+                .required()
+                .min(1)
+                .end()
+                
+            validate("data.pagination.perPage")
+                .required()
+                .min(1)
+                .end()
+                
+            // Verify pagination math
+            validateGroup(
+                "data.pagination.total",
+                "data.pagination.perPage",
+                "data.pagination.totalPages",
+                message = "Pagination calculation is incorrect"
+            ) { values ->
+                val total = (values[0] as? Number)?.toInt() ?: 0
+                val perPage = (values[1] as? Number)?.toInt() ?: 1
+                val totalPages = (values[2] as? Number)?.toInt() ?: 0
+                
+                val expectedTotalPages = Math.ceil(total.toDouble() / perPage).toInt()
+                expectedTotalPages == totalPages
+            }
+        }
+    }
+    
+    // Error response validation
+    `when`(condition = { data ->
+        (data as? Map<*, *>)?.get("status") == "error"
+    }) {
+        validate("error")
+            .required()
+            .end()
+            
+        validate("error.code")
+            .required()
+            .end()
+            
+        validate("error.message")
+            .required()
+            .end()
+    }
+}
+```
+
+### 3. Configuration Validation
+
+```kotlin
+val configValidator = ValidationDsl.preValidate {
+    // Database configuration
+    validate("config.database.url")
+        .required()
+        .pattern(Regex("^jdbc:[a-zA-Z0-9:]+://[^\\s/$.?#]+\\.[^\\s]+$"))
+        .end()
+        
+    validate("config.database.username")
+        .required()
+        .end()
+        
+    validate("config.database.password")
+        .required()
+        .minLength(8)
+        .end()
+        
+    // Server configuration
+    validate("config.server.port")
+        .required()
+        .min(1024)
+        .max(65535)
+        .end()
+        
+    validate("config.server.maxThreads")
+        .required()
+        .min(1)
+        .max(1000)
+        .end()
+        
+    // Feature flags
+    validateAll("config.features.*")
+        .custom(
+            predicate = { it is Boolean },
+            message = "Feature flags must be boolean values"
+        )
+        .end()
+        
+    // Logging levels
+    validate("config.logging.level")
+        .required()
+        .allowedValues("DEBUG", "INFO", "WARN", "ERROR")
+        .end()
+        
+    // File paths
+    validateAll("config.paths.*")
+        .custom(
+            predicate = { path ->
+                path?.toString()?.let { 
+                    java.io.File(it).exists() 
+                } ?: false
+            },
+            message = "Path must exist on the filesystem"
+        )
+        .asWarning()  // Only warn for non-existent paths
+        .end()
+}
+```
+
+## Conclusion
+
+The PlatyMap Validation DSL provides a powerful, flexible way to ensure your data meets all requirements before, during, and after mapping operations. By combining validation with mapping, you can create robust data transformation pipelines that catch errors early and produce reliable results.
+
+For more advanced usage, refer to the API documentation or explore the source code to understand the full capabilities of the validation framework.
