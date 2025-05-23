@@ -1,0 +1,1387 @@
+---
+description: "This guide covers everything you need to know about using and extending Platymap's logging capabilities."
+title: "Logging"
+---
+
+Platymap's logging system provides comprehensive visibility into your data transformations and validations. It enables you to track the flow of data, debug complex mappings, and create audit trails of all operations. The system is designed to be:
+
+- **Flexible**: Configure global defaults or per-mapping settings
+- **Comprehensive**: Log at any point in your mappings and validations
+- **Performant**: Optimized for minimal overhead in production
+- **Extensible**: Easy to integrate with existing logging frameworks
+
+## Global Logging Configuration
+
+### Setting Up Global Logging
+
+To configure logging globally for all mappings and validations:
+
+```kotlin
+Platymap.configureLogging {
+    level(LogLevel.INFO)        // Set minimum log level
+    includeDataInLogs(true)     // Include data values in logs
+    logToConsole()              // Log to console
+    logToFile("/path/to/platymap.log")  // Also log to file
+}
+```
+
+This configuration applies to all mappings unless overridden.
+
+### Log Levels
+
+Platymap supports five standard logging levels:
+
+| Level | Purpose                        | Example Use Case                 |
+| ----- | ------------------------------ | -------------------------------- |
+| TRACE | Highly detailed information    | Individual value transformations |
+| DEBUG | Detailed debugging information | Values before and after mapping  |
+| INFO  | General informational messages | Start/completion of operations   |
+| WARN  | Warning situations             | Fallback to default values       |
+| ERROR | Error conditions               | Failed transformations           |
+
+Choose your log level based on your needs:
+
+```kotlin
+// Development environment
+Platymap.configureLogging {
+    level(LogLevel.DEBUG)  // Shows detailed information
+}
+
+// Production environment
+Platymap.configureLogging {
+    level(LogLevel.WARN)  // Only log warnings and errors
+}
+```
+
+### Log Destinations
+
+Platymap can send logs to multiple destinations:
+
+```kotlin
+Platymap.configureLogging {
+    // Clear any existing destinations
+    clearDestinations()
+    
+    // Add destinations
+    logToConsole()
+    logToFile("/var/log/platymap/mapping.log")
+    
+    // Rotate log files daily
+    logToFile("/var/log/platymap/mapping.log", maxFiles = 7, rotateDaily = true)
+}
+```
+
+### Log Formatting
+
+You can customize the format of log messages:
+
+```kotlin
+// Define a custom formatter
+class CustomFormatter : LogFormatter {
+    override fun format(level: LogLevel, message: String, data: Any?): String {
+        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(Date())
+        val dataString = data?.let { " - Data: $it" } ?: ""
+        return "[$timestamp] ${level.name.padEnd(5)}: $message$dataString"
+    }
+}
+
+// Use the custom formatter
+Platymap.configureLogging {
+    useFormatter(CustomFormatter())
+}
+```
+
+## Logging in Mappings
+
+### Basic Logging in Mappings
+
+Add log statements at key points in your mappings:
+
+```kotlin
+val mapping = Platymap.flow("customer")
+    .to("profile")
+    .info("Starting customer to profile mapping")  // INFO level log
+    
+    .map("firstName").to("givenName").end()
+    .debug("Mapped first name")  // DEBUG level log
+    
+    .map("lastName").to("familyName").end()
+    .debug("Mapped last name")
+    
+    .info("Completed customer to profile mapping")
+    .build()
+```
+
+Platymap provides convenient methods for each log level:
+
+```kotlin
+.trace("Very detailed information")
+.debug("Helpful for debugging")
+.info("General information")
+.warn("Something to watch out for")
+.error("Something went wrong")
+```
+
+### Logging Data Values
+
+Log specific data fields:
+
+```kotlin
+.logData("Processing customer", "customer.id", "customer.email")
+```
+
+This logs both the message and the values of the specified paths.
+
+For sensitive data, be selective about what you log:
+
+```kotlin
+.logData("Processing payment", "payment.amount", "payment.currency")
+// Don't log: "payment.cardNumber"
+```
+
+### Contextual Logging
+
+Add context to your logs:
+
+```kotlin
+.map("orderId").transform { orderId ->
+    // Set context for subsequent logs
+    context.setProperty("currentOrderId", orderId)
+    orderId
+}.to("order.id").end()
+
+// Use context in later logs
+.info("Processing order ${context.getProperty("currentOrderId")}")
+```
+
+### Conditional Logging
+
+Use branches to log conditionally:
+
+```kotlin
+.branch()
+    .doWhen { data -> 
+        (data as? Map<*, *>)?.get("totalAmount").toString().toDouble() > 1000 
+    }
+    .then()
+        .warn("Processing high-value order")
+        // High-value specific mappings
+    .endBranch()
+    .otherwise()
+        .debug("Processing standard order")
+        // Standard mappings
+    .endBranch()
+.end()
+```
+
+## Logging in Validations
+
+### Basic Validation Logging
+
+Add logs to your validation rules:
+
+```kotlin
+val validator = ValidationDsl.preValidate {
+    // Log at the start of validation
+    info("Starting user data validation")
+    
+    // Log specific data
+    logData("Validating user", "username", "email")
+    
+    // Regular validation rules
+    validate("username")
+        .required()
+        .minLength(4)
+        .end()
+        
+    validate("email")
+        .required()
+        .email()
+        .end()
+        
+    // Log at the end of validation
+    info("User validation complete")
+}
+```
+
+### Field-Level Validation Logging
+
+Log during field validation:
+
+```kotlin
+validate("password")
+    .debug("Validating password complexity")
+    .required()
+    .minLength(8)
+    .custom({ password ->
+        // Password complexity check
+        password.toString().matches(Regex(".*[A-Z].*")) &&
+        password.toString().matches(Regex(".*[a-z].*")) &&
+        password.toString().matches(Regex(".*\\d.*")) &&
+        password.toString().matches(Regex(".*[!@#$%^&*].*"))
+    }, "Password must include uppercase, lowercase, digit, and special character")
+    .end()
+```
+
+### Conditional Validation Logging
+
+Log during conditional validation:
+
+```kotlin
+`when`(condition = { data ->
+    val hasPhysicalMail = (data as? Map<*, *>)?.get("preferences")?.let {
+        (it as? Map<*, *>)?.get("physicalMail") == true
+    } ?: false
+    
+    if (hasPhysicalMail) {
+        debug("User requested physical mail, validating address")
+    }
+    
+    hasPhysicalMail
+}) {
+    validate("address.street")
+        .required()
+        .minLength(5)
+        .end()
+        
+    validate("address.city")
+        .required()
+        .end()
+        
+    validate("address.zipCode")
+        .required()
+        .pattern(Regex("^\\d{5}(-\\d{4})?$"))
+        .end()
+}
+```
+
+### Validation Log Levels
+
+Choose appropriate log levels for validation:
+
+```kotlin
+// For general progress
+info("Starting validation")
+
+// For detailed field validation
+debug("Validating email format")
+
+// For potential issues
+warn("Using default country when not specified")
+
+// For serious problems
+error("Required fields missing")
+```
+
+## Advanced Logging Features
+
+### Per-Mapping Configuration
+
+Configure logging separately for each mapping:
+
+```kotlin
+val mapping = Platymap.flow("sensitive-data")
+    .to("processed-data")
+    .withLogging {
+        level(LogLevel.WARN)         // Only log warnings and errors
+        includeDataInLogs(false)     // Don't include data
+        logToFile("/path/to/sensitive-mapping.log")  // Log to file
+    }
+    // Mapping rules...
+    .build()
+```
+
+### Log Interception
+
+Intercept logs for filtering or additional processing:
+
+```kotlin
+// Create a log interceptor
+class SensitiveDataFilterInterceptor : LogInterceptor {
+    private val sensitivePatterns = listOf(
+        Regex("\\d{3}-\\d{2}-\\d{4}"),     // SSN pattern
+        Regex("\\d{4}-\\d{4}-\\d{4}-\\d{4}")  // Credit card pattern
+    )
+    
+    override fun intercept(level: LogLevel, message: String, data: Any?): Boolean {
+        // Check if message contains sensitive data
+        val containsSensitiveData = sensitivePatterns.any { it.containsMatchIn(message) }
+        
+        if (containsSensitiveData) {
+            // Redact sensitive data
+            val sanitizedMessage = sensitivePatterns.fold(message) { acc, pattern ->
+                acc.replace(pattern, "***REDACTED***")
+            }
+            
+            // Log the sanitized version instead
+            Logger.log(level, sanitizedMessage, data)
+            return true  // We've handled this log
+        }
+        
+        return false  // Continue with normal logging
+    }
+}
+
+// Register the interceptor
+Platymap.configureLogging {
+    addInterceptor(SensitiveDataFilterInterceptor())
+}
+```
+
+### Custom Log Destinations
+
+Create custom log destinations for special needs:
+
+```kotlin
+class DatabaseLogDestination(private val dataSource: DataSource) : LogDestination {
+    override fun log(formattedMessage: String) {
+        dataSource.connection.use { conn ->
+            val stmt = conn.prepareStatement(
+                "INSERT INTO mapping_logs (message, timestamp) VALUES (?, NOW())"
+            )
+            stmt.setString(1, formattedMessage)
+            stmt.executeUpdate()
+        }
+    }
+}
+
+// Use custom destination
+Platymap.configureLogging {
+    logToCustomDestination(DatabaseLogDestination(myDataSource))
+}
+```
+
+### Custom Log Formatters
+
+Create a custom formatter for structured logging:
+
+```kotlin
+class JsonLogFormatter : LogFormatter {
+    override fun format(level: LogLevel, message: String, data: Any?): String {
+        return buildJsonString {
+            jsonObject {
+                put("timestamp", System.currentTimeMillis())
+                put("level", level.name)
+                put("message", message)
+                if (data != null) {
+                    put("data", data.toString())
+                }
+            }
+        }
+    }
+}
+
+// Use custom formatter
+Platymap.configureLogging {
+    useFormatter(JsonLogFormatter())
+}
+```
+
+## Complete Examples
+
+### Customer Onboarding Example
+
+This example demonstrates comprehensive logging during customer onboarding:
+
+```kotlin
+// Configure logging
+Platymap.configureLogging {
+    level(LogLevel.INFO)
+    includeDataInLogs(false)  // Don't include full data for privacy
+    logToConsole()
+    logToFile("/var/log/platymap/customer-onboarding.log")
+}
+
+// Create validator with logging
+val customerValidator = ValidationDsl.preValidate {
+    info("Starting customer validation")
+    
+    logData("Customer basic info", "customer.id", "customer.email")
+    
+    validate("customer.email")
+        .debug("Validating email format")
+        .required()
+        .email()
+        .end()
+        
+    validate("customer.firstName")
+        .required()
+        .end()
+        
+    validate("customer.lastName")
+        .required()
+        .end()
+        
+    // Address validation
+    `when`(condition = { data ->
+        val hasAddress = (data as? Map<*, *>)?.get("customer")?.let {
+            (it as? Map<*, *>)?.containsKey("address") == true
+        } ?: false
+        
+        if (hasAddress) {
+            debug("Customer provided address, validating")
+        }
+        
+        hasAddress
+    }) {
+        validate("customer.address.street")
+            .required()
+            .end()
+            
+        validate("customer.address.city")
+            .required()
+            .end()
+            
+        validate("customer.address.zipCode")
+            .required()
+            .pattern(Regex("^\\d{5}(-\\d{4})?$"))
+            .end()
+    }
+    
+    info("Customer validation complete")
+}
+
+// Create mapping with logging
+val customerMapping = Platymap.flow("customer")
+    .withFormat(FormatType.JSON)
+    .to("account")
+    .withFormat(FormatType.JSON)
+    
+    // Use validation
+    .withPreValidation {
+        info("Starting customer data validation")
+        validate("customer.email").required().email().end()
+        // More validation rules...
+    }
+    
+    // Start mapping
+    .info("Starting customer onboarding process")
+    .logData("Processing customer", "customer.id", "customer.email")
+    
+    // Basic mapping
+    .map("customer.firstName").to("account.firstName").end()
+    .map("customer.lastName").to("account.lastName").end()
+    
+    // Email with transformation and logging
+    .map("customer.email")
+        .transform { email -> 
+            debug("Normalizing email: $email")
+            email.toString().lowercase().trim()
+        }
+        .to("account.email")
+        .end()
+    .branch()
+        .doWhen { data -> 
+            val customerType = (data as? Map<*, *>)?.get("customer")?.let {
+                (it as? Map<*, *>)?.get("type")
+            }
+            
+            val isPremium = customerType == "premium"
+            if (isPremium) {
+                info("Processing premium customer")
+            }
+            
+            isPremium
+        }
+        .then()
+            .map("customer.loyaltyNumber").to("account.loyaltyId").end()
+            .map("customer.memberSince").to("account.memberSince").end()
+            .debug("Added premium customer details")
+        .endBranch()
+        .otherwise()
+            .debug("Processing standard customer")
+            .map("'standard'").to("account.type").end()
+        .endBranch()
+    .end()
+    
+    // Collection processing with logging
+    .forEach("customer.addresses").as("address")
+        .info("Processing address")
+        .create("account.addressList")
+        .map("$address.type").to("addressType").end()
+        .map("$address.street").to("streetAddress").end()
+        .map("$address.city").to("city").end()
+        .map("$address.state").to("state").end()
+        .map("$address.zipCode").to("zipCode").end()
+        .logData("Address processed", "$address.type")
+        .end()
+    .end()
+    
+    // Completion logging
+    .info("Customer onboarding complete")
+    
+    // Add post-validation with logging
+    .withPostValidation {
+        info("Validating processed account data")
+        validate("account.email").required().end()
+        validate("account.firstName").required().end()
+        validate("account.lastName").required().end()
+        info("Account validation complete")
+    }
+    
+    .build()
+
+// Execute with logging
+try {
+    val result = customerMapping.executeToJson(customerJson)
+    println("Onboarding successful")
+} catch (e: Exception) {
+    Logger.error("Onboarding failed: ${e.message}")
+}
+```
+
+### Financial Transaction Example
+
+This example demonstrates logging for sensitive financial transactions:
+
+```kotlin
+// Custom log interceptor for financial data
+class FinancialDataInterceptor : LogInterceptor {
+    override fun intercept(level: LogLevel, message: String, data: Any?): Boolean {
+        // Mask account numbers
+        if (data is Map<*, *> && data.containsKey("accountNumber")) {
+            val maskedData = data.toMutableMap()
+            val accountNumber = maskedData["accountNumber"]?.toString() ?: ""
+            
+            if (accountNumber.length > 4) {
+                maskedData["accountNumber"] = "****" + accountNumber.takeLast(4)
+            }
+            
+            // Log with masked data
+            Logger.log(level, message, maskedData)
+            return true  // Handled this log
+        }
+        
+        // Also mask any account numbers in the message itself
+        if (message.contains(Regex("\\b\\d{10,}\\b"))) {
+            val maskedMessage = message.replace(
+                Regex("\\b(\\d{6})\\d+\\b"), 
+                { matchResult -> "${matchResult.groupValues[1]}****" }
+            )
+            Logger.log(level, maskedMessage, data)
+            return true
+        }
+        
+        return false  // Continue with normal logging
+    }
+}
+
+// Configure logging for financial transactions
+Platymap.configureLogging {
+    level(LogLevel.INFO)
+    includeDataInLogs(false)  // Don't include sensitive data by default
+    logToFile("/var/log/platymap/financial-transactions.log")
+    addInterceptor(FinancialDataInterceptor())
+}
+
+// Define validation with logging
+val transactionValidator = ValidationDsl.preValidate {
+    info("Starting transaction validation")
+    
+    validate("transaction.amount")
+        .required()
+        .min(0.01)
+        .debug("Validating transaction amount")
+        .end()
+        
+    validate("transaction.currency")
+        .required()
+        .allowedValues("USD", "EUR", "GBP", "JPY")
+        .end()
+        
+    validate("transaction.sourceAccount")
+        .required()
+        .custom({ account ->
+            // Log with care to avoid exposing full account number
+            debug("Validating source account: ${account.toString().takeLast(4)}")
+            account.toString().length >= 10  // Simple validation
+        }, "Invalid source account")
+        .end()
+        
+    validate("transaction.destinationAccount")
+        .required()
+        .custom({ account ->
+            debug("Validating destination account: ${account.toString().takeLast(4)}")
+            account.toString().length >= 10
+        }, "Invalid destination account")
+        .end()
+        
+    info("Transaction validation complete")
+}
+
+// Create mapping with logging
+val transactionMapping = Platymap.flow("transaction")
+    .withFormat(FormatType.JSON)
+    .to("processedTransaction")
+    .withFormat(FormatType.JSON)
+    
+    // Use pre-validation
+    .withPreValidation {
+        info("Validating financial transaction")
+        validate("transaction.amount").required().min(0.01).end()
+        validate("transaction.currency").required().end()
+        // More validations...
+    }
+    
+    // Logging transaction initiation
+    .info("Starting financial transaction processing")
+    .logData("Processing transaction", 
+             "transaction.id", 
+             "transaction.amount", 
+             "transaction.currency")
+    
+    // Basic transaction mapping
+    .map("transaction.id").to("processedTransaction.transactionId").end()
+    .map("transaction.timestamp").to("processedTransaction.processedAt").end()
+    
+    // Amount with currency formatting
+    .map("transaction.amount")
+        .transform { amount -> 
+            debug("Processing amount: $amount")
+            (amount as Number).toDouble()
+        }
+        .to("processedTransaction.amount")
+        .end()
+        
+    .map("transaction.currency").to("processedTransaction.currency").end()
+    
+    // Source account with masked logging
+    .map("transaction.sourceAccount")
+        .transform { account ->
+            val accStr = account.toString()
+            // Deliberately only log last 4 digits
+            debug("Processing source account: ****${accStr.takeLast(4)}")
+            accStr
+        }
+        .to("processedTransaction.source")
+        .end()
+        
+    // Destination account with masked logging
+    .map("transaction.destinationAccount")
+        .transform { account ->
+            val accStr = account.toString()
+            debug("Processing destination account: ****${accStr.takeLast(4)}")
+            accStr
+        }
+        .to("processedTransaction.destination")
+        .end()
+        
+    // Transaction status
+    .map("'PENDING'").to("processedTransaction.status").end()
+    
+    // Fee calculation with logging
+    .map("transaction.amount")
+        .transform { amount ->
+            val amountValue = (amount as Number).toDouble()
+            val fee = amountValue * 0.01  // 1% fee
+            info("Calculated fee: $fee")
+            fee
+        }
+        .to("processedTransaction.fee")
+        .end()
+        
+    // Completion logging
+    .info("Financial transaction processing complete")
+    
+    .build()
+
+// Execute with logging and error handling
+try {
+    val result = transactionMapping.executeToJson(transactionJson)
+    Logger.info("Transaction processed successfully", mapOf(
+        "transactionId" to extractTransactionId(result)
+    ))
+} catch (e: ValidationException) {
+    Logger.error("Transaction validation failed", mapOf(
+        "errors" to e.errors.map { "${it.path}: ${it.message}" }
+    ))
+} catch (e: Exception) {
+    Logger.error("Transaction processing failed: ${e.message}")
+}
+```
+
+## Best Practices
+
+### Log Level Strategy
+
+Choose the right log level for each message:
+
+| Level | When to Use |
+|-------|-------------|
+| TRACE | For highly detailed diagnostics during development |
+| DEBUG | For development information that helps debugging |
+| INFO  | For tracking normal application flow |
+| WARN  | For potentially harmful situations that don't prevent operation |
+| ERROR | For errors that prevent operations from completing |
+
+### Performance Considerations
+
+Optimize logging for performance:
+
+1. **Use appropriate log levels**: In production, set log level to INFO or WARN to reduce overhead.
+
+```kotlin
+// Production configuration
+Platymap.configureLogging {
+    level(LogLevel.WARN)  // Only log warnings and errors
+}
+```
+
+2. **Lazy evaluation for expensive operations**:
+
+```kotlin
+// Instead of:
+.debug("Complex calculation: ${expensiveCalculation()}")
+
+// Do this:
+.debug("Complex calculation") { expensiveCalculation() }
+```
+
+3. **Buffered logging for high-volume scenarios**:
+
+```kotlin
+class BufferedFileLogDestination(
+    private val filePath: String,
+    private val bufferSize: Int = 1000
+) : LogDestination {
+    private val buffer = ArrayList<String>(bufferSize)
+    
+    override fun log(formattedMessage: String) {
+        synchronized(buffer) {
+            buffer.add(formattedMessage)
+            if (buffer.size >= bufferSize) {
+                flush()
+            }
+        }
+    }
+    
+    fun flush() {
+        synchronized(buffer) {
+            if (buffer.isNotEmpty()) {
+                File(filePath).appendText(buffer.joinToString("\n") + "\n")
+                buffer.clear()
+            }
+        }
+    }
+}
+```
+
+### Security and Privacy
+
+Protect sensitive information in logs:
+
+1. **Never log sensitive data directly**:
+
+```kotlin
+// Bad:
+.logData("Processing payment", "payment.cardNumber")
+
+// Good:
+.logData("Processing payment", "payment.amount", "payment.currency")
+```
+
+2. **Use data masking**:
+
+```kotlin
+// Create masked identifiers
+.map("customer.ssn")
+    .transform { ssn ->
+        // Log only masked version
+        debug("Processing SSN: ***-**-${ssn.toString().takeLast(4)}")
+        ssn
+    }
+    .to("profile.taxId")
+    .end()
+```
+
+3. **Use log interceptors for sensitive patterns**:
+
+```kotlin
+class SensitiveDataInterceptor : LogInterceptor {
+    override fun intercept(level: LogLevel, message: String, data: Any?): Boolean {
+        // Mask SSNs, credit card numbers, etc.
+        val maskedMessage = message
+            .replace(Regex("\\d{3}-\\d{2}-\\d{4}"), "***-**-****")
+            .replace(Regex("\\d{4}-\\d{4}-\\d{4}-\\d{4}"), "****-****-****-****")
+        
+        Logger.log(level, maskedMessage, data)
+        return true
+    }
+}
+```
+
+### Troubleshooting with Logs
+
+Design logs for effective troubleshooting:
+
+1. **Include correlation IDs**:
+
+```kotlin
+// Generate a unique ID for each mapping operation
+val mappingId = UUID.randomUUID().toString()
+
+val mapping = Platymap.flow("source")
+    .to("target")
+    .info("Starting mapping operation [id=$mappingId]")
+    // ... mapping rules ...
+    .info("Completed mapping operation [id=$mappingId]")
+    .build()
+```
+
+2. **Log inputs and outputs at key points**:
+
+```kotlin
+.map("customer.creditScore")
+    .transform { score ->
+        debug("Original credit score: $score")
+        val adjustedScore = calculateAdjustedScore(score)
+        debug("Adjusted credit score: $adjustedScore")
+        adjustedScore
+    }
+    .to("profile.creditRating")
+    .end()
+```
+
+3. **Use structured logging for machine parsing**:
+
+```kotlin
+class StructuredLogFormatter : LogFormatter {
+    override fun format(level: LogLevel, message: String, data: Any?): String {
+        val map = mutableMapOf<String, Any?>(
+            "timestamp" to System.currentTimeMillis(),
+            "level" to level.name,
+            "message" to message
+        )
+        
+        if (data != null) {
+            map["data"] = data
+        }
+        
+        return JSONObject(map).toString()
+    }
+}
+```
+
+## Extending the Logging System
+
+### Creating Custom Log Components
+
+#### Custom Log Destination
+
+Create a custom destination to send logs anywhere:
+
+```kotlin
+class ElasticsearchLogDestination(
+    private val elasticsearchClient: ElasticsearchClient,
+    private val indexName: String
+) : LogDestination {
+    override fun log(formattedMessage: String) {
+        try {
+            val doc = HashMap<String, Any>()
+            doc["message"] = formattedMessage
+            doc["timestamp"] = Date()
+            
+            elasticsearchClient.index(
+                IndexRequest(indexName).source(doc)
+            )
+        } catch (e: Exception) {
+            System.err.println("Failed to log to Elasticsearch: ${e.message}")
+        }
+    }
+}
+
+// Use custom destination
+Platymap.configureLogging {
+    logToCustomDestination(ElasticsearchLogDestination(esClient, "platymap-logs"))
+}
+```
+
+#### Custom Log Formatter
+
+Create a custom formatter for specialized formatting:
+
+```kotlin
+class CloudWatchFormatter : LogFormatter {
+    override fun format(level: LogLevel, message: String, data: Any?): String {
+        val timestamp = System.currentTimeMillis()
+        val dataStr = when (data) {
+            null -> ""
+            is Map<*, *> -> data.entries.joinToString(", ") { "${it.key}=${it.value}" }
+            else -> data.toString()
+        }
+        
+        return "$timestamp\t${level.name}\t$message\t$dataStr"
+    }
+}
+```
+
+#### Custom Log Interceptor
+
+Create a log interceptor for special processing:
+
+```kotlin
+class MetricsCollectingInterceptor(
+    private val metricsRegistry: MetricsRegistry
+) : LogInterceptor {
+    override fun intercept(level: LogLevel, message: String, data: Any?): Boolean {
+        // Collect metrics but don't interfere with logging
+        metricsRegistry.incrementCounter("platymap.logs.count", mapOf(
+            "level" to level.name
+        ))
+        
+        // Track error count separately
+        if (level == LogLevel.ERROR) {
+            metricsRegistry.incrementCounter("platymap.errors.count")
+        }
+        
+        return false  // Continue with normal logging
+    }
+}
+```
+
+### Integrating with External Logging Systems
+
+#### Integrating with SLF4J
+
+Create an SLF4J adapter:
+
+```kotlin
+class Slf4jLogDestination(
+    private val loggerName: String = "platymap"
+) : LogDestination {
+    private val logger = LoggerFactory.getLogger(loggerName)
+    
+    override fun log(formattedMessage: String) {
+        // Extract level from formatted message (assumes format starts with level)
+        val level = extractLevel(formattedMessage)
+        val message = removeLevel(formattedMessage)
+        
+        when (level) {
+            LogLevel.TRACE -> logger.trace(message)
+            LogLevel.DEBUG -> logger.debug(message)
+            LogLevel.INFO -> logger.info(message)
+            LogLevel.WARN -> logger.warn(message)
+            LogLevel.ERROR -> logger.error(message)
+        }
+    }
+    
+    private fun extractLevel(message: String): LogLevel {
+        // Implementation to extract level from formatted message
+        // This depends on your formatter
+        return LogLevel.INFO  // Default
+    }
+    
+    private fun removeLevel(message: String): String {
+        // Implementation to remove level prefix from message
+        // This depends on your formatter
+        val levelPattern = Regex("\\[(TRACE|DEBUG|INFO|WARN|ERROR)\\]")
+        return message.replace(levelPattern, "").trim()
+    }
+}
+
+// Use the SLF4J adapter
+Platymap.configureLogging {
+    // Clear default destinations
+    clearDestinations()
+    
+    // Use SLF4J for all logging
+    logToCustomDestination(Slf4jLogDestination("xyz.mahmoudahmed.platymap"))
+    
+    // Use a simple formatter that works with the SLF4J adapter
+    useFormatter(object : LogFormatter {
+        override fun format(level: LogLevel, message: String, data: Any?): String {
+            val dataStr = data?.let { " - $it" } ?: ""
+            return "[${level.name}] $message$dataStr"
+        }
+    })
+}
+```
+
+#### Integrating with Log4j
+
+Create a Log4j adapter:
+
+```kotlin
+class Log4jLogDestination(
+    private val loggerName: String = "platymap"
+) : LogDestination {
+    private val logger = LogManager.getLogger(loggerName)
+    
+    override fun log(formattedMessage: String) {
+        // Extract level from formatted message
+        val levelAndMessage = extractLevelAndMessage(formattedMessage)
+        val level = levelAndMessage.first
+        val message = levelAndMessage.second
+        
+        when (level) {
+            LogLevel.TRACE -> logger.trace(message)
+            LogLevel.DEBUG -> logger.debug(message)
+            LogLevel.INFO -> logger.info(message)
+            LogLevel.WARN -> logger.warn(message)
+            LogLevel.ERROR -> logger.error(message)
+        }
+    }
+    
+    private fun extractLevelAndMessage(message: String): Pair<LogLevel, String> {
+        // Implementation to extract level and clean message
+        val levelMatch = Regex("\\[(TRACE|DEBUG|INFO|WARN|ERROR)\\]").find(message)
+        
+        val level = when (levelMatch?.groupValues?.get(1)) {
+            "TRACE" -> LogLevel.TRACE
+            "DEBUG" -> LogLevel.DEBUG
+            "WARN" -> LogLevel.WARN
+            "ERROR" -> LogLevel.ERROR
+            else -> LogLevel.INFO
+        }
+        
+        val cleanMessage = message.replace(Regex("\\[(TRACE|DEBUG|INFO|WARN|ERROR)\\]"), "").trim()
+        
+        return Pair(level, cleanMessage)
+    }
+}
+```
+
+### Adding Metrics and Monitoring
+
+Enhance your logging with metrics collection:
+
+#### Basic Metrics Collector
+
+```kotlin
+class LoggingMetricsCollector {
+    private val counts = ConcurrentHashMap<String, AtomicLong>()
+    
+    fun incrementCount(metric: String) {
+        counts.computeIfAbsent(metric) { AtomicLong(0) }.incrementAndGet()
+    }
+    
+    fun getCount(metric: String): Long {
+        return counts[metric]?.get() ?: 0
+    }
+    
+    fun getAllMetrics(): Map<String, Long> {
+        return counts.mapValues { it.value.get() }
+    }
+    
+    fun reset() {
+        counts.clear()
+    }
+}
+
+// Create a metrics interceptor
+class MetricsLogInterceptor(private val collector: LoggingMetricsCollector) : LogInterceptor {
+    override fun intercept(level: LogLevel, message: String, data: Any?): Boolean {
+        // Track total logs
+        collector.incrementCount("logs.total")
+        
+        // Track by level
+        collector.incrementCount("logs.${level.name.lowercase()}")
+        
+        // Track errors specially
+        if (level == LogLevel.ERROR || level == LogLevel.WARN) {
+            collector.incrementCount("logs.issues")
+        }
+        
+        // Continue with normal logging
+        return false
+    }
+}
+
+// Use the metrics collector
+val metricsCollector = LoggingMetricsCollector()
+
+Platymap.configureLogging {
+    addInterceptor(MetricsLogInterceptor(metricsCollector))
+}
+
+// Periodically report metrics
+val scheduler = Executors.newScheduledThreadPool(1)
+scheduler.scheduleAtFixedRate({
+    val metrics = metricsCollector.getAllMetrics()
+    println("Platymap Logging Metrics:")
+    metrics.forEach { (metric, count) ->
+        println("  $metric: $count")
+    }
+}, 1, 1, TimeUnit.MINUTES)
+```
+
+#### Integration with Prometheus
+
+```kotlin
+class PrometheusMetricsExporter(
+    private val registry: CollectorRegistry = CollectorRegistry.defaultRegistry
+) {
+    private val logCounter = Counter.build()
+        .name("platymap_logs_total")
+        .help("Total number of Platymap logs")
+        .labelNames("level")
+        .register(registry)
+    
+    private val mappingCounter = Counter.build()
+        .name("platymap_mappings_total")
+        .help("Total number of Platymap mapping operations")
+        .labelNames("status")
+        .register(registry)
+    
+    private val mappingDuration = Summary.build()
+        .name("platymap_mapping_duration_seconds")
+        .help("Duration of Platymap mapping operations")
+        .register(registry)
+    
+    fun incrementLogCount(level: LogLevel) {
+        logCounter.labels(level.name.lowercase()).inc()
+    }
+    
+    fun incrementMappingCount(success: Boolean) {
+        val status = if (success) "success" else "failure"
+        mappingCounter.labels(status).inc()
+    }
+    
+    fun recordMappingDuration(durationSeconds: Double) {
+        mappingDuration.observe(durationSeconds)
+    }
+    
+    fun createHttpServer(port: Int) {
+        HTTPServer(port, registry)
+    }
+}
+
+// Create a Prometheus metrics interceptor
+class PrometheusLogInterceptor(private val exporter: PrometheusMetricsExporter) : LogInterceptor {
+    override fun intercept(level: LogLevel, message: String, data: Any?): Boolean {
+        exporter.incrementLogCount(level)
+        return false  // Continue with normal logging
+    }
+}
+
+// Use with Platymap
+val prometheusExporter = PrometheusMetricsExporter()
+prometheusExporter.createHttpServer(8080)  // Expose metrics on port 8080
+
+Platymap.configureLogging {
+    addInterceptor(PrometheusLogInterceptor(prometheusExporter))
+}
+
+// Track mapping performance
+val mapping = Platymap.flow("source")
+    .to("target")
+    // Add timing measurement
+    .addRule(object : MappingRule {
+        override fun apply(context: MappingContext, target: Any) {
+            context.setProperty("mappingStartTime", System.nanoTime())
+        }
+    })
+    // Mapping rules...
+    .addRule(object : MappingRule {
+        override fun apply(context: MappingContext, target: Any) {
+            val startTime = context.getProperty("mappingStartTime") as Long
+            val duration = (System.nanoTime() - startTime) / 1_000_000_000.0
+            prometheusExporter.recordMappingDuration(duration)
+            prometheusExporter.incrementMappingCount(true)
+        }
+    })
+    .build()
+```
+
+## Structured Logging Patterns
+
+Implement structured logging for better analysis:
+
+### JSON Structured Logging
+
+```kotlin
+class JsonStructuredFormatter : LogFormatter {
+    private val objectMapper = ObjectMapper()
+    
+    override fun format(level: LogLevel, message: String, data: Any?): String {
+        val logEntry = mutableMapOf<String, Any>()
+        logEntry["timestamp"] = Instant.now().toString()
+        logEntry["level"] = level.name
+        logEntry["message"] = message
+        
+        if (data != null) {
+            when (data) {
+                is Map<*, *> -> logEntry["data"] = data
+                else -> logEntry["data"] = data.toString()
+            }
+        }
+        
+        return try {
+            objectMapper.writeValueAsString(logEntry)
+        } catch (e: Exception) {
+            // Fallback if JSON serialization fails
+            "{\"timestamp\":\"${Instant.now()}\",\"level\":\"${level.name}\",\"message\":\"$message\",\"error\":\"Failed to serialize log entry\"}"
+        }
+    }
+}
+
+// Use JSON structured logging
+Platymap.configureLogging {
+    useFormatter(JsonStructuredFormatter())
+    logToFile("/var/log/platymap/structured.log")
+}
+```
+
+### Contextual Structured Logging
+
+```kotlin
+class ContextualStructuredFormatter : LogFormatter {
+    private val objectMapper = ObjectMapper()
+    
+    override fun format(level: LogLevel, message: String, data: Any?): String {
+        val logEntry = mutableMapOf<String, Any>()
+        
+        // Basic log entry fields
+        logEntry["timestamp"] = Instant.now().toString()
+        logEntry["level"] = level.name
+        logEntry["message"] = message
+        
+        // Add thread context if present
+        val threadContext = ThreadContext.getContext()
+        if (threadContext.isNotEmpty()) {
+            logEntry["context"] = threadContext
+        }
+        
+        // Add data if present
+        if (data != null) {
+            when (data) {
+                is Map<*, *> -> logEntry["data"] = data
+                else -> logEntry["data"] = data.toString()
+            }
+        }
+        
+        return try {
+            objectMapper.writeValueAsString(logEntry)
+        } catch (e: Exception) {
+            // Fallback
+            "{\"error\":\"Failed to serialize log entry\",\"raw_message\":\"$message\"}"
+        }
+    }
+}
+
+// Thread context helper
+object ThreadContext {
+    private val contextHolder = ThreadLocal<MutableMap<String, Any>>()
+    
+    fun clear() {
+        contextHolder.remove()
+    }
+    
+    fun put(key: String, value: Any) {
+        val context = contextHolder.get() ?: mutableMapOf<String, Any>().also {
+            contextHolder.set(it)
+        }
+        context[key] = value
+    }
+    
+    fun getContext(): Map<String, Any> {
+        return contextHolder.get()?.toMap() ?: emptyMap()
+    }
+}
+
+// Use with a mapping
+// Add context before mapping
+ThreadContext.clear()
+ThreadContext.put("requestId", UUID.randomUUID().toString())
+ThreadContext.put("userId", currentUserId)
+
+// Execute mapping
+val result = mapping.execute(data)
+
+// Clear context after mapping
+ThreadContext.clear()
+```
+
+## Logging and Debugging Techniques
+
+### Tracing Data Flow
+
+Track how data moves through your mappings:
+
+```kotlin
+val mapping = Platymap.flow("source")
+    .to("target")
+    .logData("Input data", "source.id", "source.name")
+    
+    // Track a value before transformation
+    .map("source.value")
+        .transform { value ->
+            trace("Before transformation: $value")
+            val transformed = processValue(value)
+            trace("After transformation: $transformed")
+            transformed
+        }
+        .to("target.processedValue")
+        .end()
+    
+    // Log final output
+    .addRule(object : MappingRule {
+        override fun apply(context: MappingContext, target: Any) {
+            debug("Final mapping output", target)
+        }
+    })
+    .build()
+```
+
+### Debugging Complex Mappings
+
+Use logging to debug complex mappings:
+
+```kotlin
+// Add debug toggle
+val debugMode = true
+
+val mapping = Platymap.flow("source")
+    .to("target")
+    
+    // Conditionally enable detailed logging
+    .branch()
+        .doWhen { debugMode }
+        .then()
+            .info("DEBUG MODE ENABLED - showing detailed logs")
+        .endBranch()
+    .end()
+    
+    // Add verbose logging when in debug mode
+    .map("source.complexObject")
+        .transform { obj ->
+            if (debugMode) {
+                debug("Processing complex object structure:")
+                when (obj) {
+                    is Map<*, *> -> obj.forEach { (k, v) -> 
+                        debug("  $k: $v") 
+                    }
+                    else -> debug("  $obj")
+                }
+            }
+            
+            // Actual transformation
+            transformComplexObject(obj)
+        }
+        .to("target.result")
+        .end()
+    
+    .build()
+```
+
+## Conclusion
+
+Platymap's comprehensive logging system provides the visibility you need to understand, debug, and monitor your data transformations and validations. By following the practices in this guide, you can implement effective logging strategies that balance detail with performance.
+
+Remember these key points:
+
+1. **Configure appropriately for your environment**: Use detailed logging in development and focus on warnings and errors in production.
+
+2. **Be mindful of sensitive data**: Never log sensitive information directly. Use masking and interception to protect privacy.
+
+3. **Add strategic log points**: Place logs at the beginning and end of operations, and at key decision points in your mappings.
+
+4. **Use structured logging for analysis**: Consider JSON or other structured formats for logs that will be machine-processed.
+
+5. **Monitor and measure**: Integrate with your existing monitoring systems to track performance and errors.
+
+6. **Extend as needed**: The flexible architecture allows you to integrate with any logging framework or monitoring system.
+
+With proper logging configuration, you'll gain full visibility into your data transformations while maintaining application performance and security.
+
+For more information about Platymap's features or to contribute to the project, visit our GitHub repository or contact the development team.
