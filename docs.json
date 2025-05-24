@@ -21,7 +21,9 @@
               "/get-started/advanced-mapping",
                "/get-started/validation",
               "/get-started/transformation",
-               "/get-started/logging"
+               "/get-started/logging",
+               "/get-started/field-combination"
+
 
             ]
           },

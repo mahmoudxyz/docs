@@ -1,0 +1,273 @@
+---
+title: "Field Combination"
+description: "This guide shows how to combine multiple fields during mapping. Platymap makes it easy to join fields together with various formatting options."
+---
+
+## Basic Combinations
+
+### Simple Joining
+
+Combine fields with a space separator:
+
+```kotlin
+.map("firstName", "lastName").to("fullName").end()
+```
+
+**Input:**
+
+```json
+{
+  "firstName": "John",
+  "lastName": "Doe"
+}
+```
+
+**Output:**
+
+```json
+{
+  "fullName": "John Doe"
+}
+```
+
+### Custom Separators
+
+Join fields with any separator:
+
+```kotlin
+.map("street", "city", "state", "zip").to("address").joinWith(", ")
+```
+
+**Input:**
+
+```json
+{
+  "street": "123 Main St",
+  "city": "Anytown",
+  "state": "CA",
+  "zip": "12345"
+}
+```
+
+**Output:**
+
+```json
+{
+  "address": "123 Main St, Anytown, CA, 12345"
+}
+```
+
+### No Separator
+
+Concatenate fields without separators:
+
+```kotlin
+.map("countryCode", "areaCode", "number").to("rawPhone").concatenate()
+```
+
+**Input:**
+
+```json
+{
+  "countryCode": "1",
+  "areaCode": "555",
+  "number": "1234567"
+}
+```
+
+**Output:**
+
+```json
+{
+  "rawPhone": "15551234567"
+}
+```
+
+## Transforming Combinations
+
+### Applying Transformers
+
+Apply transformations to combined fields:
+
+```kotlin
+.map("firstName", "lastName").to("fullName").uppercase().end()
+```
+
+**Input:**
+
+```json
+{
+  "firstName": "John",
+  "lastName": "Doe"
+}
+```
+
+**Output:**
+
+```json
+{
+  "fullName": "JOHN DOE"
+}
+```
+
+### Custom Transformations
+
+Create custom formatting:
+
+```kotlin
+.map("areaCode", "number")
+    .transform { values ->
+        val list = values as List<*>
+        val area = list.getOrNull(0)?.toString() ?: ""
+        val num = list.getOrNull(1)?.toString() ?: ""
+        DataNode.StringValue("($area) $num")
+    }
+    .to("formattedPhone")
+    .end()
+```
+
+**Input:**
+
+```json
+{
+  "areaCode": "555",
+  "number": "1234567"
+}
+```
+
+**Output:**
+
+```json
+{
+  "formattedPhone": "(555) 1234567"
+}
+```
+
+## Common Use Cases
+
+### Name Formatting
+
+Format names with titles:
+
+```kotlin
+.map("title", "firstName", "lastName")
+    .transform { values ->
+        val list = values as List<*>
+        val title = list.getOrNull(0)?.toString() ?: ""
+        val first = list.getOrNull(1)?.toString() ?: ""
+        val last = list.getOrNull(2)?.toString() ?: ""
+        
+        if (title.isNotEmpty()) {
+            DataNode.StringValue("$title. $first $last")
+        } else {
+            DataNode.StringValue("$first $last")
+        }
+    }
+    .to("formattedName")
+    .end()
+```
+
+**Input:**
+
+```json
+{
+  "title": "Dr",
+  "firstName": "Jane",
+  "lastName": "Smith"
+}
+```
+
+**Output:**
+
+```json
+{
+  "formattedName": "Dr. Jane Smith"
+}
+```
+
+### Address Formatting
+
+Format addresses:
+
+```kotlin
+.map("street", "apt")
+    .transform { values ->
+        val list = values as List<*>
+        val street = list.getOrNull(0)?.toString() ?: ""
+        val apt = list.getOrNull(1)?.toString() ?: ""
+        
+        if (apt.isNotEmpty()) {
+            DataNode.StringValue("$street, Apt $apt")
+        } else {
+            DataNode.StringValue(street)
+        }
+    }
+    .to("streetAddress")
+    .end()
+```
+
+**Input:**
+
+```json
+{
+  "street": "123 Main St",
+  "apt": "4B"
+}
+```
+
+**Output:**
+
+```json
+{
+  "streetAddress": "123 Main St, Apt 4B"
+}
+```
+
+### Email Generation
+
+Generate an email from name parts:
+
+```kotlin
+.map("firstName", "lastName", "domain")
+    .transform { values ->
+        val list = values as List<*>
+        val first = list.getOrNull(0)?.toString()?.lowercase() ?: ""
+        val last = list.getOrNull(1)?.toString()?.lowercase() ?: ""
+        val domain = list.getOrNull(2)?.toString() ?: ""
+        
+        DataNode.StringValue("$first.$last@$domain")
+    }
+    .to("email")
+    .end()
+```
+
+**Input:**
+
+```json
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "domain": "example.com"
+}
+```
+
+**Output:**
+
+```json
+{
+  "email": "john.doe@example.com"
+}
+```
+
+## Method Reference
+
+| Method                     | Description                 | Example                 |
+| -------------------------- | --------------------------- | ----------------------- |
+| `map(field1, field2, ...)` | Start a multi-field mapping | `.map("first", "last")` |
+| `to(targetField)`          | Specify target field        | `.to("fullName")`       |
+| `end()`                    | Finalize the mapping        | `.end()`                |
+| `joinWith(separator)`      | Join with custom separator  | `.joinWith(", ")`       |
+| `concatenate()`            | Join without separators     | `.concatenate()`        |
+| `transform(function)`      | Apply custom transformation | `.transform { ... }`    |
+
+You can combine these methods with any standard transformers (`uppercase()`, `trim()`, etc.) to further process the combined result.
