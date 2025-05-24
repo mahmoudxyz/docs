@@ -1,6 +1,6 @@
 ---
-title: 'Transformation System'
-description: 'Platymap's transformation system allows you to modify data during the mapping process. Rather than just moving values from one location to another, you can transform them along the way - converting formats, changing case, performing calculations, and much more.'
+title: "Transformation System"
+description: "Platymap's transformation system allows you to modify data during the mapping process. Rather than just moving values from one location to another, you can transform them along the way - converting formats, changing case, performing calculations, and much more."
 ---
 
 ### Key Benefits
@@ -29,6 +29,7 @@ In this example, the `uppercase()` transformation converts the value of `name` t
 ### How Transformations Work
 
 Each transformation is a function that:
+
 1. Takes an input value
 2. Processes it according to specific rules
 3. Returns a transformed value
@@ -47,35 +48,35 @@ String transformations modify text values. These are especially useful for data 
 
 ### Text Case Transformations
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `uppercase()` | Converts text to uppercase | "hello world" | "HELLO WORLD" |
-| `lowercase()` | Converts text to lowercase | "Hello World" | "hello world" |
-| `capitalize()` | Capitalizes first letter of each word | "hello world" | "Hello World" |
-| `titleCase()` | Converts to title case | "hello world" | "Hello World" |
-| `camelCase()` | Converts to camelCase | "hello world" | "helloWorld" |
-| `snakeCase()` | Converts to snake_case | "Hello World" | "hello_world" |
-| `kebabCase()` | Converts to kebab-case | "Hello World" | "hello-world" |
+| Transformation | Description                           | Example Input | Example Output |
+| -------------- | ------------------------------------- | ------------- | -------------- |
+| `uppercase()`  | Converts text to uppercase            | "hello world" | "HELLO WORLD"  |
+| `lowercase()`  | Converts text to lowercase            | "Hello World" | "hello world"  |
+| `capitalize()` | Capitalizes first letter of each word | "hello world" | "Hello World"  |
+| `titleCase()`  | Converts to title case                | "hello world" | "Hello World"  |
+| `camelCase()`  | Converts to camelCase                 | "hello world" | "helloWorld"   |
+| `snakeCase()`  | Converts to snake_case                | "Hello World" | "hello_world"  |
+| `kebabCase()`  | Converts to kebab-case                | "Hello World" | "hello-world"  |
 
 ### Text Formatting Transformations
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `trim()` | Removes whitespace from start and end | " hello " | "hello" |
-| `truncate()` | Truncates to 30 chars with ellipsis | "This is a very long text that needs truncating" | "This is a very long text that..." |
-| `truncateLong()` | Truncates to 100 chars with ellipsis | Long text... | Truncated long text... |
-| `stripHtml()` | Removes HTML tags | "<p>Hello</p>" | "Hello" |
-| `mask()` | Masks all but last 4 chars | "1234567890" | "******7890" |
-| `spacesToDashes()` | Replaces spaces with dashes | "hello world" | "hello-world" |
-| `newlinesToBreaks()` | Replaces newlines with <br> | "line1\nline2" | "line1<br>line2" |
-| `slugify()` | Creates a URL-friendly slug | "Hello World! 123" | "hello-world-123" |
+| Transformation       | Description                           | Example Input                                    | Example Output                     |
+| -------------------- | ------------------------------------- | ------------------------------------------------ | ---------------------------------- |
+| `trim()`             | Removes whitespace from start and end | " hello "                                        | "hello"                            |
+| `truncate()`         | Truncates to 30 chars with ellipsis   | "This is a very long text that needs truncating" | "This is a very long text that..." |
+| `truncateLong()`     | Truncates to 100 chars with ellipsis  | Long text...                                     | Truncated long text...             |
+| `stripHtml()`        | Removes HTML tags                     | "\<p\>Hello\</p\>"                               | "Hello"                            |
+| `mask()`             | Masks all but last 4 chars            | "1234567890"                                     | "\*\*\*\*\*\*7890"                 |
+| `spacesToDashes()`   | Replaces spaces with dashes           | "hello world"                                    | "hello-world"                      |
+| `newlinesToBreaks()` | Replaces newlines with \<br\>         | "line1\\nline2"                                  | "line1\<br\>line2"                 |
+| `slugify()`          | Creates a URL-friendly slug           | "Hello World\! 123"                              | "hello-world-123"                  |
 
 ### Text Padding Transformations
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `padLeft10()` | Pads left to 10 chars with zeros | "123" | "0000000123" |
-| `padRight20()` | Pads right to 20 chars with spaces | "hello" | "hello               " |
+| Transformation | Description                        | Example Input | Example Output         |
+| -------------- | ---------------------------------- | ------------- | ---------------------- |
+| `padLeft10()`  | Pads left to 10 chars with zeros   | "123"         | "0000000123"           |
+| `padRight20()` | Pads right to 20 chars with spaces | "hello"       | "hello               " |
 
 ### Example Usage
 
@@ -95,27 +96,27 @@ Number transformations allow you to perform mathematical operations and format n
 
 ### Mathematical Operations
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `increment()` | Adds 1 to a number | 5 | 6 |
-| `decrement()` | Subtracts 1 from a number | 5 | 4 |
-| `toPercentage()` | Multiplies by 100 | 0.25 | 25 |
-| `fromPercentage()` | Divides by 100 | 25 | 0.25 |
-| `round()` | Rounds to nearest integer | 4.7 | 5 |
-| `floor()` | Rounds down to nearest integer | 4.7 | 4 |
-| `ceil()` | Rounds up to nearest integer | 4.2 | 5 |
-| `abs()` | Takes absolute value | -5 | 5 |
-| `roundToTwoDecimals()` | Rounds to 2 decimal places | 4.7654 | 4.77 |
-| `roundToWholeNumber()` | Rounds to a whole number | 4.7 | 5 |
+| Transformation         | Description                    | Example Input | Example Output |
+| ---------------------- | ------------------------------ | ------------- | -------------- |
+| `increment()`          | Adds 1 to a number             | 5             | 6              |
+| `decrement()`          | Subtracts 1 from a number      | 5             | 4              |
+| `toPercentage()`       | Multiplies by 100              | 0.25          | 25             |
+| `fromPercentage()`     | Divides by 100                 | 25            | 0.25           |
+| `round()`              | Rounds to nearest integer      | 4.7           | 5              |
+| `floor()`              | Rounds down to nearest integer | 4.7           | 4              |
+| `ceil()`               | Rounds up to nearest integer   | 4.2           | 5              |
+| `abs()`                | Takes absolute value           | -5            | 5              |
+| `roundToTwoDecimals()` | Rounds to 2 decimal places     | 4.7654        | 4.77           |
+| `roundToWholeNumber()` | Rounds to a whole number       | 4.7           | 5              |
 
 ### Formatting Operations
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `formatNumber()` | Formats with commas and decimals | 1234.5 | "1,234.50" |
-| `formatUSD()` | Formats as USD | 1234.5 | "$1,234.50" |
-| `formatEUR()` | Formats as EUR | 1234.5 | "€1,234.50" |
-| `formatGBP()` | Formats as GBP | 1234.5 | "£1,234.50" |
+| Transformation   | Description                      | Example Input | Example Output |
+| ---------------- | -------------------------------- | ------------- | -------------- |
+| `formatNumber()` | Formats with commas and decimals | 1234.5        | "1,234.50"     |
+| `formatUSD()`    | Formats as USD                   | 1234.5        | "\$1,234.50"   |
+| `formatEUR()`    | Formats as EUR                   | 1234.5        | "€1,234.50"    |
+| `formatGBP()`    | Formats as GBP                   | 1234.5        | "£1,234.50"    |
 
 ### Example Usage
 
@@ -135,38 +136,38 @@ Date transformations help you format, manipulate, and extract information from d
 
 ### Date Formatting
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `formatDateLong()` | Formats to long date format | "2023-01-15" | "January 15, 2023" |
-| `formatDateShort()` | Formats to short date format | "2023-01-15" | "01/15/2023" |
-| `formatDateTime()` | Formats date and time | "2023-01-15T14:30:00Z" | "Jan 15, 2023 at 2:30 PM" |
-| `toIsoDate()` | Converts to ISO date format | "01/15/2023" | "2023-01-15" |
-| `toIsoDateTime()` | Converts to ISO date-time format | "01/15/2023" | "2023-01-15T00:00:00Z" |
-| `formatRelativeDate()` | Shows relative to current time | "2023-01-15" | "2 months ago" |
+| Transformation         | Description                      | Example Input          | Example Output            |
+| ---------------------- | -------------------------------- | ---------------------- | ------------------------- |
+| `formatDateLong()`     | Formats to long date format      | "2023-01-15"           | "January 15, 2023"        |
+| `formatDateShort()`    | Formats to short date format     | "2023-01-15"           | "01/15/2023"              |
+| `formatDateTime()`     | Formats date and time            | "2023-01-15T14:30:00Z" | "Jan 15, 2023 at 2:30 PM" |
+| `toIsoDate()`          | Converts to ISO date format      | "01/15/2023"           | "2023-01-15"              |
+| `toIsoDateTime()`      | Converts to ISO date-time format | "01/15/2023"           | "2023-01-15T00:00:00Z"    |
+| `formatRelativeDate()` | Shows relative to current time   | "2023-01-15"           | "2 months ago"            |
 
 ### Date Manipulation
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `addOneDay()` | Adds one day to date | "2023-01-15" | "2023-01-16" |
-| `addOneWeek()` | Adds one week to date | "2023-01-15" | "2023-01-22" |
-| `addOneMonth()` | Adds one month to date | "2023-01-15" | "2023-02-15" |
-| `addOneYear()` | Adds one year to date | "2023-01-15" | "2024-01-15" |
+| Transformation  | Description            | Example Input | Example Output |
+| --------------- | ---------------------- | ------------- | -------------- |
+| `addOneDay()`   | Adds one day to date   | "2023-01-15"  | "2023-01-16"   |
+| `addOneWeek()`  | Adds one week to date  | "2023-01-15"  | "2023-01-22"   |
+| `addOneMonth()` | Adds one month to date | "2023-01-15"  | "2023-02-15"   |
+| `addOneYear()`  | Adds one year to date  | "2023-01-15"  | "2024-01-15"   |
 
 ### Date Extraction
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `extractYear()` | Extracts year from date | "2023-01-15" | 2023 |
-| `extractMonth()` | Extracts month from date | "2023-01-15" | 1 |
-| `extractDay()` | Extracts day from date | "2023-01-15" | 15 |
+| Transformation   | Description              | Example Input | Example Output |
+| ---------------- | ------------------------ | ------------- | -------------- |
+| `extractYear()`  | Extracts year from date  | "2023-01-15"  | 2023           |
+| `extractMonth()` | Extracts month from date | "2023-01-15"  | 1              |
+| `extractDay()`   | Extracts day from date   | "2023-01-15"  | 15             |
 
 ### Date Conversion
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `dateToTimestamp()` | Converts date to Unix timestamp | "2023-01-15T00:00:00Z" | 1673740800 |
-| `timestampToDate()` | Converts Unix timestamp to date | 1673740800 | "2023-01-15T00:00:00Z" |
+| Transformation      | Description                     | Example Input          | Example Output         |
+| ------------------- | ------------------------------- | ---------------------- | ---------------------- |
+| `dateToTimestamp()` | Converts date to Unix timestamp | "2023-01-15T00:00:00Z" | 1673740800             |
+| `timestampToDate()` | Converts Unix timestamp to date | 1673740800             | "2023-01-15T00:00:00Z" |
 
 ### Example Usage
 
@@ -186,20 +187,20 @@ Boolean transformations convert true/false values to different formats and perfo
 
 ### Boolean Conversion
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `booleanToString()` | Converts boolean to string | true | "true" |
-| `toYesNo()` | Converts to "Yes" or "No" | true | "Yes" |
-| `toEnabledDisabled()` | Converts to "Enabled" or "Disabled" | true | "Enabled" |
-| `toActiveInactive()` | Converts to "Active" or "Inactive" | true | "Active" |
-| `booleanToNumber()` | Converts to 1 or 0 | true | 1 |
-| `stringToBoolean()` | Converts string to boolean | "yes" | true |
+| Transformation        | Description                         | Example Input | Example Output |
+| --------------------- | ----------------------------------- | ------------- | -------------- |
+| `booleanToString()`   | Converts boolean to string          | true          | "true"         |
+| `toYesNo()`           | Converts to "Yes" or "No"           | true          | "Yes"          |
+| `toEnabledDisabled()` | Converts to "Enabled" or "Disabled" | true          | "Enabled"      |
+| `toActiveInactive()`  | Converts to "Active" or "Inactive"  | true          | "Active"       |
+| `booleanToNumber()`   | Converts to 1 or 0                  | true          | 1              |
+| `stringToBoolean()`   | Converts string to boolean          | "yes"         | true           |
 
 ### Logical Operations
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `negate()` | Reverses boolean value | true | false |
+| Transformation | Description            | Example Input | Example Output |
+| -------------- | ---------------------- | ------------- | -------------- |
+| `negate()`     | Reverses boolean value | true          | false          |
 
 ### Example Usage
 
@@ -219,24 +220,24 @@ Collection transformations work with arrays and lists of values.
 
 ### Collection Operations
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `join()` | Joins array elements with spaces | ["a", "b", "c"] | "a b c" |
-| `joinComma()` | Joins array elements with commas | ["a", "b", "c"] | "a, b, c" |
-| `joinPipe()` | Joins array elements with pipes | ["a", "b", "c"] | "a \| b \| c" |
-| `size()` | Gets collection size | ["a", "b", "c"] | 3 |
-| `first()` | Gets first element | ["a", "b", "c"] | "a" |
-| `last()` | Gets last element | ["a", "b", "c"] | "c" |
-| `sort()` | Sorts elements | ["c", "a", "b"] | ["a", "b", "c"] |
-| `reverse()` | Reverses order | ["a", "b", "c"] | ["c", "b", "a"] |
-| `filterNulls()` | Removes null values | ["a", null, "c"] | ["a", "c"] |
+| Transformation  | Description                      | Example Input    | Example Output  |
+| --------------- | -------------------------------- | ---------------- | --------------- |
+| `join()`        | Joins array elements with spaces | ["a", "b", "c"]  | "a b c"         |
+| `joinComma()`   | Joins array elements with commas | ["a", "b", "c"]  | "a, b, c"       |
+| `joinPipe()`    | Joins array elements with pipes  | ["a", "b", "c"]  | "a \| b \| c"   |
+| `size()`        | Gets collection size             | ["a", "b", "c"]  | 3               |
+| `first()`       | Gets first element               | ["a", "b", "c"]  | "a"             |
+| `last()`        | Gets last element                | ["a", "b", "c"]  | "c"             |
+| `sort()`        | Sorts elements                   | ["c", "a", "b"]  | ["a", "b", "c"] |
+| `reverse()`     | Reverses order                   | ["a", "b", "c"]  | ["c", "b", "a"] |
+| `filterNulls()` | Removes null values              | ["a", null, "c"] | ["a", "c"]      |
 
 ### String-to-Collection Conversion
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `split()` | Splits string on commas | "a,b,c" | ["a", "b", "c"] |
-| `splitComma()` | Splits string on commas | "a, b, c" | ["a", "b", "c"] |
+| Transformation | Description             | Example Input | Example Output  |
+| -------------- | ----------------------- | ------------- | --------------- |
+| `split()`      | Splits string on commas | "a,b,c"       | ["a", "b", "c"] |
+| `splitComma()` | Splits string on commas | "a, b, c"     | ["a", "b", "c"] |
 
 ### Example Usage
 
@@ -256,24 +257,24 @@ Conditional transformations check conditions and provide default values.
 
 ### Default Values
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `defaultIfNull()` | Uses default if value is null | null | "" |
-| `defaultIfEmpty()` | Uses default if value is empty | "" | "N/A" |
-| `ifNull()` | Replaces null with specified value | null | "null" |
-| `ifEmpty()` | Replaces empty with specified value | "" | "empty" |
+| Transformation     | Description                         | Example Input | Example Output |
+| ------------------ | ----------------------------------- | ------------- | -------------- |
+| `defaultIfNull()`  | Uses default if value is null       | null          | ""             |
+| `defaultIfEmpty()` | Uses default if value is empty      | ""            | "N/A"          |
+| `ifNull()`         | Replaces null with specified value  | null          | "null"         |
+| `ifEmpty()`        | Replaces empty with specified value | ""            | "empty"        |
 
 ### Condition Checks
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `isNull()` | Checks if value is null | null | true |
-| `isEmpty()` | Checks if value is empty | "" | true |
-| `isNumber()` | Checks if value is a number | "123" | true |
-| `equalsTest()` | Checks if equals "test" | "test" | true |
-| `containsTest()` | Checks if contains "test" | "testing" | true |
-| `startsWithPrefix()` | Checks if starts with "prefix" | "prefix123" | true |
-| `endsWithSuffix()` | Checks if ends with "suffix" | "123suffix" | true |
+| Transformation       | Description                    | Example Input | Example Output |
+| -------------------- | ------------------------------ | ------------- | -------------- |
+| `isNull()`           | Checks if value is null        | null          | true           |
+| `isEmpty()`          | Checks if value is empty       | ""            | true           |
+| `isNumber()`         | Checks if value is a number    | "123"         | true           |
+| `equalsTest()`       | Checks if equals "test"        | "test"        | true           |
+| `containsTest()`     | Checks if contains "test"      | "testing"     | true           |
+| `startsWithPrefix()` | Checks if starts with "prefix" | "prefix123"   | true           |
+| `endsWithSuffix()`   | Checks if ends with "suffix"   | "123suffix"   | true           |
 
 ### Example Usage
 
@@ -287,31 +288,33 @@ val mapping = Platymap.flow("product")
     .build()
 ```
 
-## Type Conversion Transformations
+# Type Conversion Transformations
 
 Type conversion transformations change a value from one data type to another.
 
-### Basic Type Conversions
+## Basic Type Conversions
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `toString()` | Converts to string | 123 | "123" |
-| `toInt()` | Converts to integer | "123" | 123 |
-| `toDouble()` | Converts to double | "123.45" | 123.45 |
-| `toBoolean()` | Converts to boolean | "true" | true |
+| Transformation | Description         | Example Input | Example Output |
+| -------------- | ------------------- | ------------- | -------------- |
+| `toString()`   | Converts to string  | 123           | "123"          |
+| `toInt()`      | Converts to integer | "123"         | 123            |
+| `toDouble()`   | Converts to double  | "123.45"      | 123.45         |
+| `toBoolean()`  | Converts to boolean | "true"        | true           |
 
-### Advanced Conversions
+## Advanced Conversions
 
-| Transformation | Description | Example Input | Example Output |
-|----------------|-------------|---------------|----------------|
-| `parseJson()` | Parses JSON string to object | "{\"a\":1}" | {a: 1} |
-| `toJsonString()` | Converts object to JSON string | {a: 1} | "{\"a\":1}" |
-| `toBase64()` | Encodes to Base64 | "hello" | "aGVsbG8=" |
-| `fromBase64()` | Decodes from Base64 | "aGVsbG8=" | "hello" |
-| `urlEncode()` | URL encodes a string | "a b" | "a%20b" |
-| `urlDecode()` | URL decodes a string | "a%20b" | "a b" |
+| Transformation   | Description                    | Example Input | Example Output |
+| ---------------- | ------------------------------ | ------------- | -------------- |
+| `parseJson()`    | Parses JSON string to object   | `"{"a":1}"`   | `{a: 1}`       |
+| `toJsonString()` | Converts object to JSON string | `{a: 1}`      | `"{"a":1}"`    |
+| `toBase64()`     | Encodes to Base64              | "hello"       | "aGVsbG8="     |
+| `fromBase64()`   | Decodes from Base64            | "aGVsbG8="    | "hello"        |
+| `urlEncode()`    | URL encodes a string           | "a b"         | "a%20b"        |
+| `urlDecode()`    | URL decodes a string           | "a%20b"       | "a b"          |
 
-### Example Usage
+## Example Usage
+
+Here's how to use these transformations in a mapping configuration:
 
 ```kotlin
 val mapping = Platymap.flow("data")
@@ -322,6 +325,14 @@ val mapping = Platymap.flow("data")
     .map("rawData").fromBase64().to("decodedData").end()
     .build()
 ```
+
+## Common Use Cases
+
+- **String to Number**: Convert user input strings to numeric values for calculations
+- **Boolean Conversion**: Transform string flags ("true"/"false") to boolean values
+- **JSON Processing**: Parse JSON responses or serialize objects for API calls
+- **Encoding/Decoding**: Handle Base64 data or URL-safe strings
+- **Data Sanitization**: Clean and format data before processing
 
 ## Composing Transformations
 
@@ -341,10 +352,10 @@ This first trims whitespace, then converts to uppercase.
 
 Some common composition patterns are available as convenience methods:
 
-| Composition | Equivalent To |
-|-------------|---------------|
-| `trimAndUppercase()` | `trim().uppercase()` |
-| `trimAndLowercase()` | `trim().lowercase()` |
+| Composition               | Equivalent To             |
+| ------------------------- | ------------------------- |
+| `trimAndUppercase()`      | `trim().uppercase()`      |
+| `trimAndLowercase()`      | `trim().lowercase()`      |
 | `normalizeEmailAndMask()` | `normalizeEmail().mask()` |
 
 ### Order Matters
@@ -357,8 +368,9 @@ The order in which you apply transformations can significantly affect the result
 .map("text").trim().uppercase().to("result2").end()  // "HELLO WORLD"
 ```
 
-With the input `"  hello world  "`:
-- First example: Uppercases to `"  HELLO WORLD  "`, then trims to `"HELLO WORLD"`
+With the input `" hello world "`:
+
+- First example: Uppercases to `" HELLO WORLD "`, then trims to `"HELLO WORLD"`
 - Second example: Trims to `"hello world"`, then uppercases to `"HELLO WORLD"`
 
 ### Complex Transformation Chains
@@ -492,14 +504,14 @@ fun MappingBuilder.formatPhone(): MappingBuilder = applyTransformer("formatPhone
 
 ### Common Issues and Solutions
 
-| Issue | Possible Cause | Solution |
-|-------|---------------|----------|
-| Transformation not applied | Missing `.end()` after `.to()` | Ensure every mapping ends with `.end()` |
-| Unexpected data type | Transformer expects different type | Add appropriate type conversion transformer first |
-| String appears unmodified | Input is not a string | Add `.toString()` before string transformations |
-| Number operations failing | Input is not a number | Add `.toDouble()` or `.toInt()` before number operations |
-| Date formatting error | Unrecognized date format | Use `.formatDate()` with specific patterns |
-| Null result | Source field doesn't exist | Add `.defaultIfNull()` to provide a default value |
+| Issue                      | Possible Cause                     | Solution                                                 |
+| -------------------------- | ---------------------------------- | -------------------------------------------------------- |
+| Transformation not applied | Missing `.end()` after `.to()`     | Ensure every mapping ends with `.end()`                  |
+| Unexpected data type       | Transformer expects different type | Add appropriate type conversion transformer first        |
+| String appears unmodified  | Input is not a string              | Add `.toString()` before string transformations          |
+| Number operations failing  | Input is not a number              | Add `.toDouble()` or `.toInt()` before number operations |
+| Date formatting error      | Unrecognized date format           | Use `.formatDate()` with specific patterns               |
+| Null result                | Source field doesn't exist         | Add `.defaultIfNull()` to provide a default value        |
 
 ### Debugging Transformations
 
