@@ -47,21 +47,55 @@ description: "Platymap is a high-performance, open-source data mapper library wr
 
 ### Basic Usage
 
-```java
+```kotlin
 // Create a simple mapping from customer to profile
-Mapping customerMapping = Platymap.flow("customer")
-        .withFormat(Format.JSON)
-        .to("profile")
-        .withFormat(Format.JSON)
-        .map("customer.firstName").to("profile.name.first").end()
-        .map("customer.lastName").to("profile.name.last").end()
-        .map("customer.email").to("profile.contact.email").end()
-        .build();
+        val customerMapping = Platymap.flow("customer")
+            .withFormat(Format.JSON)
+            .to("profile")
+            .withFormat(Format.JSON)
+            .map("customer.firstName").to("profile.name.first").end()
+            .map("customer.lastName").to("profile.name.last").end()
+            .map("customer.email").to("profile.contact.email").end()
+            .build()
 
-// Execute the mapping on input data
-String jsonInput = "{ \"customer\": { \"firstName\": \"John\", \"lastName\": \"Doe\", \"email\": \"john@example.com\" } }";
-String result = customerMapping.executeToJson(jsonInput);
+        val jsonInput =
+            "{ \"customer\": { \"firstName\": \"John\", \"lastName\": \"Doe\", \"email\": \"john@example.com\" } }"
+        val jsonOutput = customerMapping.executeToJson(jsonInput)
+        val xmlOutput = customerMapping.executeToXml(jsonInput)
 ```
+
+**Output**:
+
+<CodeGroup>
+
+``` JSON
+{
+  "profile": {
+    "name": {
+      "first": "John",
+      "last": "Doe"
+    },
+    "contact": {
+      "email": "john@example.com"
+    }
+  }
+}
+```
+
+
+``` XML
+<profile>
+    <name>
+        <first>John</first>
+        <last>Doe</last>
+    </name>
+    <contact>
+        <email>john@example.com</email>
+    </contact>
+</profile>
+```
+
+</CodeGroup>
 
 ## Examples
 
@@ -69,64 +103,367 @@ String result = customerMapping.executeToJson(jsonInput);
 
 Map all fields at once from one structure to another:
 
-```java
-Mapping customerMapping = Platymap.flow("customer")
+```kotlin
+    val customerMapping = Platymap.flow("customer")
         .withFormat(Format.JSON)
         .to("profile")
         .withFormat(Format.JSON)
         .mapAll("customer.*").to("profile").end()
-        .build();
+        .build()
+
+    val jsonInput = """
+        {
+            "customer": {
+                "firstName": "John",
+                "lastName": "Doe",
+                "email": "john@example.com",
+                "age": 30,
+                "address": {
+                    "street": "123 Main St",
+                    "city": "Anytown",
+                    "zipCode": "12345"
+                }
+            }
+        }
+    """.trimIndent()
+    
+    val result = customerMapping.executeToJson(jsonInput) 
 ```
 
 ### Flatten Nested Structures
 
 Transform nested objects into flat fields:
 
-```java
-Mapping addressMapping = Platymap.flow("customer")
-        .withFormat(Format.JSON)
-        .to("profile")
-        .withFormat(Format.JSON)
-        .flatten("customer.address").flattenWithPrefix("addr_").to("profile").end()
-        .map("customer.firstName").to("profile.name").end()
-        .map("customer.lastName").to("profile.surname").end()
-        .build();
+<CodeGroup>
+
+```kotlin code [expandable]
+        val addressMapping = Platymap.flow("customer")
+            .withFormat(Format.JSON)
+            .to("profile")
+            .withFormat(Format.JSON)
+            .flatten("customer.address").flattenWithPrefix("addr_").to("profile").end()
+            .map("customer.firstName").to("profile.name").end()
+            .map("customer.lastName").to("profile.surname").end()
+            .build()
+
+        // Create test input JSON with nested address structure
+        val jsonInput = """
+            {
+                "customer": {
+                    "firstName": "John",
+                    "lastName": "Doe",
+                    "address": {
+                        "street": "123 Main St",
+                        "city": "Anytown",
+                        "state": "CA",
+                        "zipCode": "12345",
+                        "country": "USA"
+                    }
+                }
+            }
+            """.trimIndent()
 ```
+
+
+```json JSON
+{
+   "profile":{
+      "name":"John",
+      "surname":"Doe",
+      "addr_street":"123 Main St",
+      "addr_city":"Anytown",
+      "addr_state":"CA",
+      "addr_zipCode":"12345",
+      "addr_country":"USA"
+   }
+}
+```
+
+</CodeGroup>
 
 ### Nest Flat Fields
 
 Group related flat fields into a structured object:
 
-```java
-Mapping productMapping = Platymap.flow("order")
-        .withFormat(Format.JSON)
-        .to("invoice")
-        .withFormat(Format.JSON)
-        .nest("order.item_*").asCollection("lineItems").to("invoice")
-        .map("order.orderNumber").to("invoice.reference").end()
-        .map("order.orderDate").to("invoice.date").end()
-        .build();
+<CodeGroup>
+
+```kotlin Simple1 [expandable]
+        val productMapping = Platymap.flow("order")
+            .withFormat(Format.JSON)
+            .to("invoice")
+            .withFormat(Format.JSON)
+            .nest("order.item_*").asCollection("lineItems").to("invoice")
+            .map("order.orderNumber").to("invoice.reference").end()
+            .map("order.orderDate").to("invoice.date").end()
+            .build()
+        val jsonInput = """
+        {
+            "order": {
+                "orderNumber": "ORD-5678",
+                "orderDate": "2023-05-15",
+                "item_1_name": "Laptop",
+                "item_1_price": 999.99,
+                "item_1_quantity": 1,
+                "item_2_name": "Mouse",
+                "item_2_price": 25.50,
+                "item_2_quantity": 2,
+                "item_3_name": "Keyboard",
+                "item_3_price": 75.00,
+                "item_3_quantity": 1,
+                "customerName": "Jane Smith"
+            }
+        }
+        """.trimIndent()
 ```
+
+
+```json output1
+        {
+            "invoice": {
+                "reference": "ORD-5678",
+                "date": "2023-05-15",
+                "lineItems": [
+                    {
+                        "name": "Laptop",
+                        "price": 999.99,
+                        "quantity": 1
+                    },
+                    {
+                        "name": "Mouse",
+                        "price": 25.5,
+                        "quantity": 2
+                    },
+                    {
+                        "name": "Keyboard",
+                        "price": 75.0,
+                        "quantity": 1
+                    }
+                ]
+            }
+        }
+```
+
+
+```kotlin Complex example2 [expandable]
+	        val formMapping = Platymap.flow("form")
+            .withFormat(Format.JSON)
+            .to("structured")
+            .withFormat(Format.JSON)
+            // Nest personal information fields
+            .nest("form.personal_*").asObject("personalInfo").to("structured")
+            // Nest address fields with a prefix
+            .nest("form.address_*").asObject("address").to("structured")
+            // Nest contact methods as a collection
+            .nest("form.contact_*_*").asCollection("contactMethods").to("structured")
+            // Nest education history as a collection
+            .nest("form.education_*_*").asCollection("educationHistory").to("structured")
+            // Nest work experience as a collection
+            .nest("form.work_*_*").asCollection("workExperience").to("structured")
+            // Map the form ID directly
+            .map("form.id").to("structured.formId").end()
+            .map("form.submissionDate").to("structured.submittedOn").end()
+            .build()
+
+        // Create a complex test input with flat fields that should be grouped
+        val jsonInput = """
+    {
+        "form": {
+            "id": "F-12345",
+            "submissionDate": "2023-06-15",
+            
+            "personal_firstName": "John",
+            "personal_lastName": "Doe",
+            "personal_birthDate": "1985-07-22",
+            "personal_gender": "Male",
+            
+            "address_street": "123 Main St",
+            "address_city": "Boston",
+            "address_state": "MA",
+            "address_zipCode": "02108",
+            "address_country": "USA",
+            
+            "contact_1_type": "Email",
+            "contact_1_value": "john.doe@example.com",
+            "contact_1_isPrimary": true,
+            "contact_2_type": "Phone",
+            "contact_2_value": "555-123-4567",
+            "contact_2_isPrimary": false,
+            
+            "education_1_institution": "Harvard University",
+            "education_1_degree": "Bachelor of Science",
+            "education_1_field": "Computer Science",
+            "education_1_yearCompleted": 2007,
+            "education_2_institution": "MIT",
+            "education_2_degree": "Master of Science",
+            "education_2_field": "Artificial Intelligence",
+            "education_2_yearCompleted": 2009,
+            
+            "work_1_company": "Tech Innovations Inc",
+            "work_1_position": "Software Engineer",
+            "work_1_startYear": 2009,
+            "work_1_endYear": 2015,
+            "work_2_company": "Digital Solutions LLC",
+            "work_2_position": "Senior Developer",
+            "work_2_startYear": 2015,
+            "work_2_endYear": 2020,
+            "work_3_company": "Future Systems",
+            "work_3_position": "Lead Architect",
+            "work_3_startYear": 2020,
+            "work_3_endYear": null
+        }
+    }
+```
+
+
+``` output2 [expandable]
+ {
+        "structured": {
+            "formId": "F-12345",
+            "submittedOn": "2023-06-15",
+            "personalInfo": {
+                "firstName": "John",
+                "lastName": "Doe",
+                "birthDate": "1985-07-22",
+                "gender": "Male"
+            },
+            "address": {
+                "street": "123 Main St",
+                "city": "Boston",
+                "state": "MA",
+                "zipCode": "02108",
+                "country": "USA"
+            },
+            "contactMethods": [
+                {
+                    "type": "Email",
+                    "value": "john.doe@example.com",
+                    "isPrimary": true
+                },
+                {
+                    "type": "Phone",
+                    "value": "555-123-4567",
+                    "isPrimary": false
+                }
+            ],
+            "educationHistory": [
+                {
+                    "institution": "Harvard University",
+                    "degree": "Bachelor of Science",
+                    "field": "Computer Science",
+                    "yearCompleted": 2007
+                },
+                {
+                    "institution": "MIT",
+                    "degree": "Master of Science",
+                    "field": "Artificial Intelligence",
+                    "yearCompleted": 2009
+                }
+            ],
+            "workExperience": [
+                {
+                    "company": "Tech Innovations Inc",
+                    "position": "Software Engineer",
+                    "startYear": 2009,
+                    "endYear": 2015
+                },
+                {
+                    "company": "Digital Solutions LLC",
+                    "position": "Senior Developer",
+                    "startYear": 2015,
+                    "endYear": 2020
+                },
+                {
+                    "company": "Future Systems",
+                    "position": "Lead Architect",
+                    "startYear": 2020,
+                    "endYear": null
+                }
+            ]
+        }
+    }
+```
+
+</CodeGroup>
 
 ### Collection Mapping
 
 Process arrays and collections:
 
-```java
-Mapping orderMapping = Platymap.flow("order")
-        .to("receipt")
-        .map("orderNumber").to("receipt.reference").end()
-        .map("customerName").to("receipt.buyer").end()
-        .forEach("items").as("item")
-        .create("receipt.lines")
-        .map("item.productName").to("description").end()
-        .map("item.quantity").to("amount").end()
-        .map("item.price").to("unitPrice").end()
-        .map("item.price * item.quantity").to("total").end()
-        .end()
-        .end()
-        .build();
+<CodeGroup>
+
+```kotlin code [expandable]
+        val orderMapping = Platymap.flow("order")
+            .to("receipt")
+            .map("orderNumber").to("receipt.reference").end()
+            .map("customerName").to("receipt.buyer").end()
+            .forEach("items").`as`("item")
+            .create("receipt.lines")
+            .map("\$item.productName").to("description").end()
+            .map("\$item.quantity").to("amount").end()
+            .map("\$item.price").to("unitPrice").end()
+            .map("\$item.price * \$item.quantity").to("total").end()
+            .end()
+            .end()
+            .build()
+
+        val jsonInput = """
+        {
+            "orderNumber": "ORD-12345",
+            "customerName": "Jane Smith",
+            "items": [
+                {
+                    "productName": "Laptop",
+                    "quantity": 1,
+                    "price": 999.99
+                },
+                {
+                    "productName": "Mouse",
+                    "quantity": 2,
+                    "price": 25.50
+                },
+                {
+                    "productName": "Keyboard",
+                    "quantity": 1,
+                    "price": 75.00
+                }
+            ]
+        }
+    """.trimIndent()
+
+        val result = orderMapping.executeToJson(jsonInput)
 ```
+
+
+```json output
+{
+   "receipt":{
+      "reference":"ORD-12345",
+      "buyer":"Jane Smith",
+      "lines":[
+         {
+            "description":"Laptop",
+            "amount":1,
+            "unitPrice":999.99,
+            "total":999.99
+         },
+         {
+            "description":"Mouse",
+            "amount":2,
+            "unitPrice":25.5,
+            "total":51.0
+         },
+         {
+            "description":"Keyboard",
+            "amount":1,
+            "unitPrice":75.0,
+            "total":75.0
+         }
+      ]
+   }
+}
+```
+
+</CodeGroup>
 
 ### Conditional Mapping
 
